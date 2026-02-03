@@ -1,0 +1,38 @@
+{
+    "name": "azd-template",
+    "image": "mcr.microsoft.com/devcontainers/python:3.11-bullseye",
+    "forwardPorts": [50505],
+    "features": {
+        "ghcr.io/devcontainers/features/node:1": {
+            "nodeGypDependencies": true,
+            "installYarnUsingApt": true,
+            "version": "lts",
+            "pnpmVersion": "latest",
+            "nvmVersion": "latest"
+        },
+        "ghcr.io/devcontainers/features/azure-cli:1": {
+            "installBicep": true,
+            "version": "latest",
+            "bicepVersion": "latest"
+        },
+        "ghcr.io/azure/azure-dev/azd:0": {
+            "version": "stable"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-azuretools.azure-dev",
+                "ms-azuretools.vscode-bicep",
+                "ms-python.python",
+                "ms-toolsai.jupyter",
+                "GitHub.vscode-github-actions"
+            ]
+        }
+    },
+    "postCreateCommand": "bash ./.devcontainer/setup_env.sh",
+    "remoteUser": "vscode",
+    "hostRequirements": {
+        "memory": "4gb"
+    }
+}

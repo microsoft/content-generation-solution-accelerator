@@ -1,0 +1,9 @@
+# Dependencies needed to run scripts/post_deploy.py locally
+#
+# Installs the core application dependencies first, then adds post-deploy-only deps.
+
+-r ../src/backend/requirements.txt
+
+# Post-deploy script deps
+azure-search-documents>=11.6.0
+httpx>=0.28.0

@@ -1,0 +1,42 @@
+# Docker ignore file for src/ build context
+# Excludes unnecessary files from Docker build
+
+# Dependencies (will be installed fresh in container)
+**/node_modules/
+**/__pycache__/
+*.pyc
+
+# Build outputs (will be built in container)
+static/
+**/dist/
+frontend-server/static/
+
+# Development files
+*.log
+*.md
+.git/
+.gitignore
+.vscode/
+.env
+.env.*
+!.env.template
+
+# Test files
+**/*.test.*
+**/*.spec.*
+__tests__/
+coverage/
+tests/
+
+# IDE and OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Deployment artifacts
+*.zip
+frontend-deploy.zip
+
+# Backend not needed for frontend build (and vice versa)
+# Comment out if building full-stack image

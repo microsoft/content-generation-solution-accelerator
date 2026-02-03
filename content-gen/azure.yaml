@@ -1,0 +1,152 @@
+environment:
+  name: content-generation
+  location: eastus
+
+name: content-generation
+metadata:
+  template: content-generation@1.22
+
+requiredVersions:
+  azd: '>= 1.18.0'
+
+parameters:
+  solutionPrefix:
+    type: string
+    default: contentgen
+    displayName: Solution Prefix
+    description: A unique prefix for all resources (3-15 chars)
+  azureAiServiceLocation:
+    type: string
+    default: eastus
+    displayName: AI Services Location
+    description: Location for Azure AI Services deployments
+  enableMonitoring:
+    type: boolean
+    default: false
+    displayName: Enable Monitoring (WAF)
+    description: Enable Log Analytics and Application Insights
+  enableScalability:
+    type: boolean
+    default: false
+    displayName: Enable Scalability (WAF)
+    description: Enable auto-scaling and higher SKUs
+  enableRedundancy:
+    type: boolean
+    default: false
+    displayName: Enable Redundancy (WAF)
+    description: Enable zone redundancy and geo-replication
+  enablePrivateNetworking:
+    type: boolean
+    default: false
+    displayName: Enable Private Networking (WAF)
+    description: Enable VNet integration and private endpoints
+
+infra:
+  provider: bicep
+  path: ./infra
+  module: main
+
+workflows:
+  up:
+    steps:
+      - azd: provision
+
+hooks:
+  postprovision:
+    windows:
+      run: |
+        Write-Host "===== Provision Complete =====" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "Web App URL: " -NoNewline
+        Write-Host "$env:WEB_APP_URL" -ForegroundColor Cyan
+        Write-Host "Storage Account: " -NoNewline
+        Write-Host "$env:AZURE_BLOB_ACCOUNT_NAME" -ForegroundColor Cyan
+        Write-Host "AI Search Service: " -NoNewline
+        Write-Host "$env:AI_SEARCH_SERVICE_NAME" -ForegroundColor Cyan
+        Write-Host "AI Search Index: " -NoNewline
+        Write-Host "$env:AZURE_AI_SEARCH_PRODUCTS_INDEX" -ForegroundColor Cyan
+        Write-Host "AI Service Location: " -NoNewline
+        Write-Host "$env:AI_SERVICE_LOCATION" -ForegroundColor Cyan
+        Write-Host "Container Instance: " -NoNewline
+        Write-Host "$env:CONTAINER_INSTANCE_NAME" -ForegroundColor Cyan     
+        
+        # Run post-deploy script to upload sample data and create search index
+        Write-Host ""
+        # Note: Cosmos DB role is assigned to deployer via Bicep.
+        Write-Host "===== Running Post-Deploy Script =====" -ForegroundColor Yellow
+        Write-Host "This will upload sample data and create the search index..."
+
+        # Ensure post-deploy Python dependencies are installed
+        $python = "python"
+        if (Test-Path "./.venv/Scripts/python.exe") { $python = "./.venv/Scripts/python.exe" }
+        elseif (Test-Path "../.venv/Scripts/python.exe") { $python = "../.venv/Scripts/python.exe" }
+        elseif (Test-Path "./.venv/bin/python") { $python = "./.venv/bin/python" }
+        elseif (Test-Path "../.venv/bin/python") { $python = "../.venv/bin/python" }
+        & $python -m pip install -r ./scripts/requirements-post-deploy.txt --quiet | Out-Null
+        
+        if (Test-Path "./scripts/post_deploy.py") {
+          & $python ./scripts/post_deploy.py --skip-tests
+          
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Post-deploy script completed successfully!" -ForegroundColor Green
+          } else {
+            Write-Host "Post-deploy script completed with warnings (some steps may have failed)" -ForegroundColor Yellow
+          }
+        } else {
+          Write-Host "Warning: post_deploy.py not found, skipping sample data upload" -ForegroundColor Yellow
+        }
+        
+        Write-Host ""
+        Write-Host "===== Deployment Complete =====" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "Access the web application:"
+        Write-Host "   $env:WEB_APP_URL" -ForegroundColor Cyan
+      shell: pwsh
+      continueOnError: false
+      interactive: true
+    posix:
+      run: |
+        echo "===== Provision Complete ====="
+        echo ""
+        echo "Web App URL: $WEB_APP_URL"
+        echo "Storage Account: $AZURE_BLOB_ACCOUNT_NAME"
+        echo "AI Search Service: $AI_SEARCH_SERVICE_NAME"
+        echo "AI Search Index: $AZURE_AI_SEARCH_PRODUCTS_INDEX"
+        echo "AI Service Location: $AI_SERVICE_LOCATION"
+        echo "Container Instance: $CONTAINER_INSTANCE_NAME"
+        
+        echo ""
+        echo "Container Registry: $ACR_NAME"
+        
+        # Run post-deploy script to upload sample data and create search index
+        echo ""
+        # Note: Cosmos DB role is assigned to deployer via Bicep.
+        echo "===== Running Post-Deploy Script ====="
+        echo "This will upload sample data and create the search index..."
+        
+        if [ -f "./scripts/post_deploy.py" ]; then
+          # Prefer local venv if present (repo root or content-gen)
+          if [ -x "./.venv/bin/python" ]; then
+            PYTHON_BIN="./.venv/bin/python"
+          elif [ -x "../.venv/bin/python" ]; then
+            PYTHON_BIN="../.venv/bin/python"
+          else
+            PYTHON_BIN="python3"
+          fi
+
+          "$PYTHON_BIN" -m pip install -r ./scripts/requirements-post-deploy.txt --quiet > /dev/null \
+            && "$PYTHON_BIN" ./scripts/post_deploy.py --skip-tests \
+            && echo "Post-deploy script completed successfully!" \
+            || echo "Post-deploy script completed with warnings (some steps may have failed)"
+        else
+          echo "Warning: post_deploy.py not found, skipping sample data upload"
+        fi
+        
+        echo ""
+        echo "===== Deployment Complete ====="
+        echo ""
+        echo "Access the web application:"
+        echo "   $WEB_APP_URL"
+      shell: sh
+      continueOnError: false
+      interactive: true

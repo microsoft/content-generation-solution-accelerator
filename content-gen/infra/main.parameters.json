@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "solutionName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "gptModelName": {
+      "value": "${gptModelName}"
+    },
+    "gptModelVersion": {
+      "value": "${gptModelVersion}"
+    },
+    "gptModelDeploymentType": {
+      "value": "${gptModelDeploymentType}"
+    },
+    "gptModelCapacity": {
+      "value": "${gptModelCapacity}"
+    },
+    "imageModelChoice": {
+      "value": "${imageModelChoice}"
+    },
+    "dalleModelCapacity": {
+      "value": "${dalleModelCapacity}"
+    },
+    "embeddingModel": {
+      "value": "${embeddingModel}"
+    },
+    "embeddingDeploymentCapacity": {
+      "value": "${embeddingDeploymentCapacity}"
+    },
+    "azureOpenaiAPIVersion": {
+      "value": "${azureOpenaiAPIVersion}"
+    },
+    "azureAiServiceLocation": {
+      "value": "${azureAiServiceLocation}"
+    },
+    "existingLogAnalyticsWorkspaceId": {
+      "value": "${existingLogAnalyticsWorkspaceId}"
+    },
+    "azureExistingAIProjectResourceId": {
+      "value": "${azureExistingAIProjectResourceId}"
+    },
+    "acrName": {
+      "value": "${acrName}"
+    },
+    "imageTag": {
+      "value": "${imageTag=latest}"
+    },
+    "enablePrivateNetworking": {
+      "value": "${enablePrivateNetworking}"
+    },
+    "enableMonitoring": {
+      "value": "${enableMonitoring}"
+    },
+    "enableScalability": {
+      "value": "${enableScalability}"
+    },
+    "enableRedundancy": {
+      "value": "${enableRedundancy}"
+    }
+  }
+}

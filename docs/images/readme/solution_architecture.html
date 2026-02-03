@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Generation Solution Architecture</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0d1b2a 0%, #1b2838 50%, #0d1b2a 100%);
+            min-height: 100vh;
+            padding: 40px;
+            color: white;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: left;
+            margin-bottom: 40px;
+            font-size: 2.2em;
+            font-weight: 600;
+            color: #ffffff;
+        }
+        .architecture {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+        .column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .service-box {
+            background: rgba(30, 45, 65, 0.9);
+            border: 1px solid rgba(74, 158, 255, 0.3);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .service-box:hover {
+            border-color: rgba(74, 158, 255, 0.7);
+            box-shadow: 0 0 20px rgba(74, 158, 255, 0.2);
+        }
+        .service-box.highlight {
+            background: rgba(40, 60, 90, 0.95);
+            border: 2px solid rgba(74, 158, 255, 0.5);
+        }
+        .service-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .service-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+        .service-name {
+            font-size: 0.95em;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+        .service-desc {
+            font-size: 0.75em;
+            color: #8ba3c7;
+            line-height: 1.4;
+        }
+        .arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #4a9eff;
+            font-size: 1.5em;
+            padding: 10px 0;
+        }
+        .arrow-right::after {
+            content: '→';
+        }
+        .arrow-down::after {
+            content: '↓';
+        }
+        .flow-label {
+            font-size: 0.7em;
+            color: #6b8ab8;
+            text-align: center;
+            margin-top: -5px;
+        }
+        .cluster {
+            background: rgba(20, 35, 55, 0.6);
+            border: 1px dashed rgba(74, 158, 255, 0.25);
+            border-radius: 12px;
+            padding: 15px;
+        }
+        .cluster-title {
+            font-size: 0.8em;
+            color: #6b8ab8;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .connection-line {
+            position: absolute;
+            background: rgba(74, 158, 255, 0.4);
+            z-index: 1;
+        }
+        .user-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .frontend-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .backend-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .data-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .ai-cluster {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .horizontal-flow {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .copyright {
+            text-align: left;
+            margin-top: 40px;
+            font-size: 0.75em;
+            color: #5a7a9a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Content Generation Solution Architecture</h1>
+        
+        <div class="architecture">
+            <!-- Column 1: User & Source -->
+            <div class="column">
+                <div class="service-box">
+                    <div class="service-icon">
+                        <svg viewBox="0 0 24 24" fill="#4a9eff">
+                            <circle cx="12" cy="8" r="4"/>
+                            <path d="M12 14c-6 0-8 3-8 5v2h16v-2c0-2-2-5-8-5z"/>
+                        </svg>
+                    </div>
+                    <div class="service-name">User</div>
+                    <div class="service-desc">Web Browser</div>
+                </div>
+                
+                <div class="arrow arrow-down"></div>
+                <div class="flow-label">HTTPS</div>
+            </div>
+
+            <!-- Column 2: Frontend Tier -->
+            <div class="column">
+                <div class="cluster">
+                    <div class="cluster-title">Frontend Tier</div>
+                    <div class="service-box">
+                        <div class="service-icon">
+                            <svg viewBox="0 0 24 24" fill="#0078d4">
+                                <rect x="3" y="3" width="18" height="14" rx="2" fill="none" stroke="#0078d4" stroke-width="2"/>
+                                <path d="M7 21h10M12 17v4" stroke="#0078d4" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <div class="service-name">App Service</div>
+                        <div class="service-desc">Node.js Express<br/>React Frontend</div>
+                    </div>
+                </div>
+                
+                <div class="arrow arrow-down"></div>
+                <div class="flow-label">API Proxy<br/>(Private VNet)</div>
+                
+                <div class="cluster">
+                    <div class="cluster-title">Container Registry</div>
+                    <div class="service-box">
+                        <div class="service-icon">
+                            <svg viewBox="0 0 24 24" fill="#0078d4">
+                                <rect x="2" y="6" width="8" height="6" rx="1" fill="#0078d4"/>
+                                <rect x="14" y="6" width="8" height="6" rx="1" fill="#0078d4"/>
+                                <rect x="8" y="12" width="8" height="6" rx="1" fill="#0078d4"/>
+                            </svg>
+                        </div>
+                        <div class="service-name">Azure Container Registry</div>
+                        <div class="service-desc">Backend Images</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 3: Backend & AI Services -->
+            <div class="column">
+                <div class="cluster">
+                    <div class="cluster-title">Backend Tier (VNet)</div>
+                    <div class="service-box highlight">
+                        <div class="service-icon">
+                            <svg viewBox="0 0 24 24" fill="#0078d4">
+                                <rect x="4" y="4" width="16" height="16" rx="2" fill="none" stroke="#0078d4" stroke-width="2"/>
+                                <circle cx="8" cy="8" r="2" fill="#0078d4"/>
+                                <circle cx="16" cy="8" r="2" fill="#0078d4"/>
+                                <circle cx="8" cy="16" r="2" fill="#0078d4"/>
+                                <circle cx="16" cy="16" r="2" fill="#0078d4"/>
+                            </svg>
+                        </div>
+                        <div class="service-name">Container Instance</div>
+                        <div class="service-desc">Python/Quart API<br/>Content Orchestrator</div>
+                    </div>
+                </div>
+                
+                <div class="arrow arrow-down"></div>
+                <div class="flow-label">Chat Completion<br/>& Image Generation</div>
+                
+                <div class="cluster ai-cluster">
+                    <div class="cluster-title">Azure OpenAI Services</div>
+                    <div class="service-box">
+                        <div class="service-icon">
+                            <svg viewBox="0 0 24 24" fill="#10a37f">
+                                <polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5" fill="none" stroke="#10a37f" stroke-width="2"/>
+                                <circle cx="12" cy="12" r="3" fill="#10a37f"/>
+                            </svg>
+                        </div>
+                        <div class="service-name">Azure OpenAI</div>
+                        <div class="service-desc">GPT-4.1 (Content Gen)</div>
+                    </div>
+                    <div class="service-box">
+                        <div class="service-icon">
+                            <svg viewBox="0 0 24 24" fill="#10a37f">
+                                <rect x="4" y="4" width="16" height="16" rx="2" fill="none" stroke="#10a37f" stroke-width="2"/>
+                                <circle cx="8" cy="10" r="2" fill="#10a37f"/>
+                                <path d="M4 18l4-4 3 3 5-6 4 4" stroke="#10a37f" stroke-width="1.5" fill="none"/>
+                            </svg>
+                        </div>
+                        <div class="service-name">Azure OpenAI</div>
+                        <div class="service-desc">DALL-E 3 (Image Gen)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 4: Data Storage -->
+            <div class="column">
+                <div class="cluster">
+                    <div class="cluster-title">Web Application</div>
+                    <div class="service-box" style="background: rgba(75, 50, 100, 0.4); border-color: rgba(150, 100, 200, 0.4);">
+                        <div class="service-icon">
+                            <svg viewBox="0 0 24 24" fill="#9966cc">
+                                <rect x="2" y="4" width="20" height="14" rx="2" fill="none" stroke="#9966cc" stroke-width="2"/>
+                                <circle cx="6" cy="7" r="1" fill="#ff5f57"/>
+                                <circle cx="9" cy="7" r="1" fill="#febc2e"/>
+                                <circle cx="12" cy="7" r="1" fill="#28c840"/>
+                            </svg>
+                        </div>
+                        <div class="service-name">Content Gen UI</div>
+                        <div class="service-desc">Chat, Generate Content,<br/>Export Documents</div>
+                    </div>
+                </div>
+                
+                <div class="arrow arrow-down"></div>
+                <div class="flow-label">CRUD Operations</div>
+                
+                <div class="cluster">
+                    <div class="cluster-title">Data Storage</div>
+                    <div class="service-box">
+                        <div class="service-icon">
+                            <svg viewBox="0 0 24 24" fill="#0078d4">
+                                <ellipse cx="12" cy="6" rx="8" ry="3" fill="none" stroke="#0078d4" stroke-width="2"/>
+                                <path d="M4 6v12c0 1.66 3.58 3 8 3s8-1.34 8-3V6" fill="none" stroke="#0078d4" stroke-width="2"/>
+                                <path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3" fill="none" stroke="#0078d4" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <div class="service-name">Cosmos DB</div>
+                        <div class="service-desc">Briefs, Products,<br/>Chat History</div>
+                    </div>
+                    <div style="height: 10px;"></div>
+                    <div class="service-box">
+                        <div class="service-icon">
+                            <svg viewBox="0 0 24 24" fill="#0078d4">
+                                <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="#0078d4" stroke-width="2"/>
+                                <path d="M4 10h16M8 6v4M12 6v4M16 6v4" stroke="#0078d4" stroke-width="1.5"/>
+                            </svg>
+                        </div>
+                        <div class="service-name">Blob Storage</div>
+                        <div class="service-desc">Product Images,<br/>Generated Content</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="copyright">© 2024 Microsoft Corporation. All rights reserved.</div>
+    </div>
+</body>
+</html>

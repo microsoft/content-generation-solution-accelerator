@@ -1,0 +1,15 @@
+.venv
+
+.env
+.azure/
+__pycache__/
+.ipynb_checkpoints/
+
+
+venv
+myenv
+
+scriptsenv/
+
+scriptenv
+pdf

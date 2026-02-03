@@ -1,15 +1,73 @@
+# Virtual environments
 .venv
-
-.env
-.azure/
-__pycache__/
-.ipynb_checkpoints/
-
-
 venv
 myenv
-
 scriptsenv/
-
 scriptenv
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# Azure
+.azure/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+eggs/
+*.egg
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node
+/content-gen/src/app/frontend/node_modules/
+/content-gen/src/app/frontend-server/node_modules/
+/content-gen/src/app/frontend-server/static/
+/content-gen/src/app/frontend-server/*.zip
+node_modules/
+
+# Build output
+/content-gen/src/app/static/
+/content-gen/src/app/frontend/dist/
+
+# Logs
+*.log
+logs/
+
+# Keys and credentials
+*.pem
+*.key
+*.pfx
+*.p12
+*secret*
+*credential*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Misc
 pdf
+*.bak
+*.tmp
+*.zip
+
+# RAI evaluation results
+rai_results/
+**/rai_results/

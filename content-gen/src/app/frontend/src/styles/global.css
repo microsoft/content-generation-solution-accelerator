@@ -1,0 +1,731 @@
+/* ============================================
+   Content Generation App - Global Styles
+   Incorporating Coral UI Patterns
+   ============================================ */
+
+:root {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light;
+  color: #1a1a1a;
+  background-color: #faf9f8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+/* ============================================
+   Layout Structure
+   ============================================ */
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 100%;
+  background-color: #faf9f8;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Chat History Panel - RIGHT side */
+.history-panel {
+  width: clamp(200px, 20vw, 320px);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #e1dfdd;
+  background-color: #f3f2f1;
+  order: 2;
+  overflow: hidden;
+}
+
+/* Chat Panel - main area */
+.chat-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  min-width: 0;
+  order: 1;
+  overflow: hidden;
+}
+
+/* ============================================
+   Chat Container - Coral Style
+   ============================================ */
+
+.chat-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+  margin: 0;
+  position: relative;
+  padding: 0 64px;
+}
+
+/* Messages Area */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 16px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  position: relative;
+}
+
+.messages p {
+  margin: 8px 0;
+  white-space: pre-wrap;
+  line-height: 1.5rem;
+}
+
+.messages li {
+  white-space: normal;
+  margin: 0;
+}
+
+.messages ol,
+.messages ul {
+  display: block;
+  list-style-type: decimal;
+  margin-block-start: 0px;
+  margin-block-end: 0px;
+  margin-inline-start: 0px;
+  margin-inline-end: 0px;
+  padding-inline-start: 24px;
+  unicode-bidi: isolate;
+}
+
+.messages a {
+  color: var(--colorBrandForeground1, #0078d4);
+}
+
+/* ============================================
+   Message Bubbles - Coral Style
+   ============================================ */
+
+.message {
+  display: inline-block;
+  word-wrap: break-word;
+  word-break: break-word;
+  box-sizing: border-box;
+}
+
+.message.user {
+  background-color: var(--colorNeutralBackground2, #f5f5f5);
+  color: var(--colorNeutralForeground2, #424242);
+  align-self: flex-end;
+  padding: 2px 16px;
+  border-radius: 6px;
+  max-width: 80%;
+}
+
+.message.assistant {
+  color: var(--colorNeutralForeground2, #424242);
+  align-self: flex-start;
+  margin: 16px 0 0 0;
+  width: 100%;
+}
+
+/* Message content markdown */
+.message-content p {
+  margin: 8px 0;
+  line-height: 1.5;
+}
+
+.message-content ul,
+.message-content ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.message-content li {
+  margin: 4px 0;
+}
+
+.message-content code {
+  background-color: var(--colorNeutralBackground3, #f5f5f5);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.9em;
+}
+
+.message-content pre {
+  background-color: var(--colorNeutralBackground3, #f5f5f5);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.message-content pre code {
+  background: transparent;
+  padding: 0;
+}
+
+/* ============================================
+   Input Wrapper - Coral Style
+   ============================================ */
+
+.input-wrapper {
+  margin: 0 16px 16px 16px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  width: calc(100% - 32px);
+  padding: 8px;
+  border-radius: var(--borderRadiusLarge, 8px);
+  background-color: var(--colorNeutralBackground1, #ffffff);
+  border: 1px solid var(--colorNeutralStroke1, #d1d1d1);
+  transition: border-color 0.2s ease-in-out;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.input-wrapper:hover {
+  border-color: var(--colorNeutralStroke1Hover, #c7c7c7);
+}
+
+.input-wrapper:active,
+.input-wrapper.focused {
+  border-color: var(--colorNeutralStroke1Pressed, #b3b3b3);
+}
+
+/* Input Field */
+.input-field {
+  resize: none;
+  overflow-y: scroll;
+  height: auto;
+  min-height: 24px;
+  max-height: 150px;
+  padding: 8px;
+  background-color: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--fontFamilyBase);
+  font-size: var(--fontSizeBase300, 14px);
+  font-weight: var(--fontWeightRegular, 400);
+  color: var(--colorNeutralForeground1, #242424);
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+/* Focus Indicator Line */
+.focus-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: var(--colorCompoundBrandStroke, #0078d4);
+  transform: scaleX(0);
+  transition: transform 0.2s ease-in-out;
+}
+
+.input-wrapper.focused .focus-indicator {
+  transform: scaleX(1);
+}
+
+/* ============================================
+   Assistant Message Footer
+   ============================================ */
+
+.assistant-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.assistant-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0.7;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.assistant-actions:hover {
+  opacity: 1;
+}
+
+/* ============================================
+   Typing/Loading Indicator
+   ============================================ */
+
+.typing-indicator {
+  font-size: 14px;
+  color: var(--colorNeutralForeground2, #666);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.thinking-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.thinking-dots .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--colorBrandBackground, #0078d4);
+  animation: pulse 1.4s infinite ease-in-out;
+}
+
+.thinking-dots .dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.thinking-dots .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking-dots .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* ============================================
+   Scroll Button
+   ============================================ */
+
+.scroll-to-bottom {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  border-radius: 50%;
+  padding: 8px;
+  cursor: pointer;
+  box-shadow: var(--shadow8);
+  margin-bottom: 16px;
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+
+@keyframes pulse {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes blink {
+  0% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes focusExpand {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ============================================
+   Custom Scrollbar - Coral Style
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 100, 100, 0.5);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(100, 100, 100, 0.7);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ============================================
+   Code Blocks
+   ============================================ */
+
+code.language-tsx,
+code.language-bash {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background-color: var(--colorNeutralBackground1, #ffffff);
+  border-radius: 4px;
+}
+
+code.language-tsx {
+  display: flex;
+}
+
+pre {
+  display: inline-block;
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  background-color: var(--colorNeutralBackground1, #ffffff);
+  padding: 4px 8px;
+  border-radius: 4px;
+  overflow: auto;
+}
+
+pre code.language-bash {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  background-color: transparent;
+}
+
+/* ============================================
+   Loading Spinner
+   ============================================ */
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--colorNeutralStroke3, #f3f3f3);
+  border-top: 2px solid var(--colorBrandForeground1, #0078d4);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-conversation {
+  color: var(--colorNeutralForeground2);
+}
+
+.loading-conversation .spinner {
+  border: 2px solid var(--colorNeutralStroke3);
+  border-top: 2px solid var(--colorBrandForeground1);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* ============================================
+   Compliance Severity Colors
+   ============================================ */
+
+.severity-error {
+  color: #d13438;
+  background-color: #fde7e9;
+  border-left: 4px solid #d13438;
+}
+
+.severity-warning {
+  color: #797775;
+  background-color: #fff4ce;
+  border-left: 4px solid #ffb900;
+}
+
+.severity-info {
+  color: #0078d4;
+  background-color: #deecf9;
+  border-left: 4px solid #0078d4;
+}
+
+.violation-card {
+  padding: 12px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
+
+/* ============================================
+   Panel Cards
+   ============================================ */
+
+.panel-card {
+  background: white;
+  border-radius: 8px;
+  padding: clamp(12px, 2vw, 20px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   Conversation Item Hover Effects
+   ============================================ */
+
+.conversation-item {
+  transition: all 0.15s ease-in-out;
+}
+
+/* ============================================
+   Product Cards
+   ============================================ */
+
+.product-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--colorNeutralStroke2, #e0e0e0);
+  background-color: var(--colorNeutralBackground1, #ffffff);
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+}
+
+.product-card:hover {
+  background-color: var(--colorNeutralBackground2, #f5f5f5);
+  border-color: var(--colorNeutralStroke1, #d1d1d1);
+}
+
+.product-card.selected {
+  border-color: var(--colorBrandStroke1, #0078d4);
+  background-color: var(--colorBrandBackground2, #e6f2ff);
+}
+
+.product-color-swatch {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid var(--colorNeutralStroke2, #e0e0e0);
+  flex-shrink: 0;
+}
+
+.product-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.product-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--colorNeutralForeground1, #242424);
+  margin-bottom: 2px;
+}
+
+.product-description {
+  font-size: 12px;
+  color: var(--colorNeutralForeground3, #616161);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.product-price {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--colorNeutralForeground1, #242424);
+  margin-top: 4px;
+}
+
+/* Product Grid View */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.product-grid .product-card {
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.product-grid .product-color-swatch {
+  width: 40px;
+  height: 40px;
+}
+
+/* ============================================
+   View Toggle Links
+   ============================================ */
+
+.view-toggle {
+  display: inline-flex;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.view-toggle-link {
+  color: var(--colorBrandForeground1, #0078d4);
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease-in-out;
+}
+
+.view-toggle-link:hover {
+  text-decoration: underline;
+}
+
+.view-toggle-link.active {
+  font-weight: 600;
+}
+
+/* ============================================
+   Action Chips
+   ============================================ */
+
+.action-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background-color: var(--colorBrandBackground2, #e6f2ff);
+  color: var(--colorBrandForeground1, #0078d4);
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid var(--colorBrandStroke1, #0078d4);
+  transition: all 0.15s ease-in-out;
+}
+
+.action-chip:hover {
+  background-color: var(--colorBrandBackground, #0078d4);
+  color: white;
+}
+
+/* ============================================
+   Responsive Design
+   ============================================ */
+
+/* Large screens (1400px+) */
+@media (min-width: 1400px) {
+  .history-panel {
+    width: 320px;
+  }
+  
+  .chat-container {
+    max-width: none;
+  }
+}
+
+/* Medium-large screens */
+@media (max-width: 1200px) {
+  .history-panel {
+    width: clamp(180px, 18vw, 260px);
+  }
+  
+  .chat-container {
+    max-width: 100%;
+  }
+}
+
+/* Tablet screens */
+@media (max-width: 992px) {
+  .main-content {
+    flex-direction: column;
+  }
+  
+  .history-panel {
+    width: 100%;
+    max-height: clamp(120px, 20vh, 200px);
+    order: 1;
+    border-left: none;
+    border-bottom: 1px solid #e1dfdd;
+  }
+  
+  .chat-panel {
+    min-width: unset;
+    flex: 1;
+    order: 2;
+  }
+  
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Small tablet / large phone */
+@media (max-width: 768px) {
+  .history-panel {
+    max-height: clamp(100px, 15vh, 160px);
+  }
+  
+  .message.user {
+    max-width: 90%;
+  }
+}
+
+/* Mobile phones */
+@media (max-width: 576px) {
+  .history-panel {
+    max-height: clamp(80px, 12vh, 120px);
+    padding: 8px;
+  }
+  
+  .messages {
+    padding: 12px 16px !important;
+  }
+}
+
+/* ============================================
+   Responsive Text Sizing
+   ============================================ */
+
+.responsive-text-sm {
+  font-size: clamp(11px, 1.5vw, 13px);
+}
+
+.responsive-text-md {
+  font-size: clamp(13px, 2vw, 16px);
+}
+
+.responsive-text-lg {
+  font-size: clamp(16px, 2.5vw, 20px);
+}
+
+.responsive-text-xl {
+  font-size: clamp(20px, 3vw, 28px);
+}
+
+/* Responsive spacing */
+.responsive-padding {
+  padding: clamp(12px, 3vw, 32px);
+}
+
+.responsive-gap {
+  gap: clamp(8px, 2vw, 24px);
+}
