@@ -15,14 +15,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         ref: ${{ github.sha }}
 
-    - uses: codfish/semantic-release-action@v3
+    - uses: codfish/semantic-release-action@v4
       id: semantic
       with:
         tag-format: 'v${version}'
+        repository-url: 'https://github.com/microsoft/content-generation-solution-accelerator'
         additional-packages: |
           ['conventional-changelog-conventionalcommits@7']
         plugins: |
