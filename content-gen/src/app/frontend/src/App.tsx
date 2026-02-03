@@ -17,17 +17,11 @@ import { ChatHistory } from './components/ChatHistory';
 import type { ChatMessage, CreativeBrief, Product, GeneratedContent } from './types';
 import ContosoLogo from './styles/images/contoso.svg';
 
-interface UserInfo {
-  user_principal_id: string;
-  user_name: string;
-  auth_provider: string;
-  is_authenticated: boolean;
-}
-
 
 function App() {
   const [conversationId, setConversationId] = useState<string>(() => uuidv4());
   const [userId, setUserId] = useState<string>('');
+  const [userName, setUserName] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<string>('');
@@ -72,18 +66,32 @@ function App() {
     fetchConfig();
   }, []);
 
-  // Fetch current user on mount
+  // Fetch current user on mount - using /.auth/me (Azure App Service built-in auth endpoint)
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await fetch('/api/user');
+        const response = await fetch('/.auth/me');
         if (response.ok) {
-          const user: UserInfo = await response.json();
-          setUserId(user.user_principal_id || 'anonymous');
+          const payload = await response.json();
+          
+          // Extract user ID from objectidentifier claim
+          const userClaims = payload[0]?.user_claims || [];
+          const objectIdClaim = userClaims.find(
+            (claim: { typ: string; val: string }) =>
+              claim.typ === 'http://schemas.microsoft.com/identity/claims/objectidentifier'
+          );
+          setUserId(objectIdClaim?.val || 'anonymous');
+          
+          // Extract display name from 'name' claim
+          const nameClaim = userClaims.find(
+            (claim: { typ: string; val: string }) => claim.typ === 'name'
+          );
+          setUserName(nameClaim?.val || '');
         }
       } catch (err) {
         console.error('Error fetching user:', err);
         setUserId('anonymous');
+        setUserName('');
       }
     };
     fetchUser();
@@ -725,17 +733,6 @@ function App() {
     }
   }, [confirmedBrief, selectedProducts, conversationId]);
 
-  // Get user initials for avatar
-  const getUserInitials = () => {
-    if (!userId) return 'U';
-    // If we have a name, use first letter of first and last name
-    const parts = userId.split('@')[0].split('.');
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    }
-    return userId[0].toUpperCase();
-  };
-
   return (
     <div className="app-container">
       {/* Header */}
@@ -764,8 +761,7 @@ function App() {
             />
           </Tooltip>
           <Avatar 
-            name={userId || 'User'}
-            initials={getUserInitials()}
+            name={userName || undefined}
             color="colorful"
             size={36}
           />

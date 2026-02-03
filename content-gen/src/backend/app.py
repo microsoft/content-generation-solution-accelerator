@@ -76,19 +76,6 @@ async def health_check():
     })
 
 
-# ==================== User Info Endpoint ====================
-
-@app.route("/api/user", methods=["GET"])
-async def get_current_user():
-    """
-    Get the current authenticated user info.
-    
-    Returns user details from EasyAuth headers, or empty values if not authenticated.
-    """
-    user = get_authenticated_user()
-    return jsonify(user)
-
-
 # ==================== Chat Endpoints ====================
 
 @app.route("/api/chat", methods=["POST"])
