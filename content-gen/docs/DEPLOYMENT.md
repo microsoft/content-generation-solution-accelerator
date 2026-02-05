@@ -161,9 +161,32 @@ Depending on your subscription quota and capacity, you can adjust quota settings
 
 </details>
 
+### Deployment Options
+
+The [`infra`](../infra) folder of the Content Generation Solution Accelerator contains the [`main.bicep`](../infra/main.bicep) Bicep script, which defines all Azure infrastructure components for this solution.
+
+By default, the `azd up` command uses the [`main.parameters.json`](../infra/main.parameters.json) file to deploy the solution. This file is pre-configured for a **sandbox environment**.
+
+For **production deployments**, the repository also provides [`main.waf.parameters.json`](../infra/main.waf.parameters.json), which applies a [Well-Architected Framework (WAF) aligned](https://learn.microsoft.com/en-us/azure/well-architected/) configuration. This can be used for Production scenarios.
+
+**How to choose your deployment configuration:**
+
+* **To use sandbox/dev environment** — Use the default `main.parameters.json` file.
+
+* **To use production configuration:**
+
+Before running `azd up`, copy the contents from the production configuration file to your main parameters file:
+
+1. Navigate to the `infra` folder in your project.
+2. Open `main.waf.parameters.json` in a text editor (like Notepad, VS Code, etc.).
+3. Select all content (Ctrl+A) and copy it (Ctrl+C).
+4. Open `main.parameters.json` in the same text editor.
+5. Select all existing content (Ctrl+A) and paste the copied content (Ctrl+V).
+6. Save the file (Ctrl+S).
+
 ### Deploying with AZD
 
-Once you've opened the project in [Codespaces](#github-codespaces), [Dev Containers](#vs-code-dev-containers), or [locally](#local-environment), you can deploy it to Azure by following the steps in the [AZD Deployment Guide](AZD_DEPLOYMENT.md)
+Once you've opened the project in [Codespaces](#github-codespaces), [Dev Containers](#vs-code-dev-containers), or [locally](#local-environment), you can deploy it to Azure by following the steps in the [AZD Deployment Guide](AZD_DEPLOYMENT.md).
 
 ## Post Deployment Steps
 

@@ -49,6 +49,21 @@
     },
     "imageTag": {
       "value": "${imageTag=latest}"
+    },
+    "enableMonitoring": {
+      "value": true
+    },
+    "enablePrivateNetworking": {
+      "value": true
+    },
+    "enableScalability": {
+      "value": true
+    },
+    "virtualMachineAdminUsername": {
+      "value": "${AZURE_ENV_VM_ADMIN_USERNAME}"
+    },
+    "virtualMachineAdminPassword": {
+      "value": "${AZURE_ENV_VM_ADMIN_PASSWORD}"
     }
   }
 }
