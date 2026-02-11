@@ -36,13 +36,11 @@ Options:
 import argparse
 import asyncio
 import base64
-import json
 import os
 import sys
-import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Dict
 
 try:
     import httpx

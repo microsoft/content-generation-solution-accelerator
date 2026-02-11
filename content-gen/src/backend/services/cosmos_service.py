@@ -308,8 +308,13 @@ class CosmosDBService:
                 max_item_count=1
             ):
                 return item
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Cross-partition conversation lookup failed for id=%s, user_id=%s: %s",
+                conversation_id,
+                user_id,
+                exc,
+            )
         
         return None
     

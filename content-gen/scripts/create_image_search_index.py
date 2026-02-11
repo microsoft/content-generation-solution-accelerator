@@ -10,7 +10,6 @@ Uses DefaultAzureCredential for authentication (RBAC).
 """
 
 import asyncio
-import json
 import os
 import sys
 from pathlib import Path

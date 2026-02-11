@@ -6,7 +6,7 @@ import time
 import pytest
 from pytest_check import check
 from playwright.sync_api import expect
-from config.constants import (URL, add_section, browse_question1, browse_question2, browse_question3,
+from config.constants import (add_section, browse_question1, browse_question2, browse_question3,
                               browse_question4, browse_question5, generate_question1, invalid_response, 
                               invalid_response1, remove_section)
 from pages.browsePage import BrowsePage
@@ -538,7 +538,6 @@ def test_show_hide_chat_history(login_logout, request):
     
     page = login_logout
     home_page = HomePage(page)
-    browse_page = BrowsePage(page)
     generate_page = GeneratePage(page)
 
     log_capture = io.StringIO()
@@ -2503,14 +2502,13 @@ def test_bug_7571_removed_sections_not_returning(request, login_logout):
         logger.info("Step 4: Enter a prompt to remove sections one by one 'Remove (section name)'")
         start = time.time()
         
-        # Select 3 sections to remove from the initial list
-        sections_to_remove = []
-        if initial_count >= 3:
-            # Remove sections at positions 1, 2, and 3 (avoid removing first section for stability)
-            indices_to_remove = [1, 2, 3] if initial_count > 3 else list(range(1, initial_count))
-            for idx in indices_to_remove:
-                if idx < len(initial_sections):
-                    sections_to_remove.append(initial_sections[idx])
+        # Select up to 3 sections to remove from the initial list (avoid removing first section for stability)
+        indices_to_remove = [1, 2, 3] if initial_count > 3 else list(range(1, initial_count))
+        sections_to_remove = [
+            initial_sections[idx]
+            for idx in indices_to_remove
+            if idx < len(initial_sections)
+        ]
         
         logger.info("Sections selected for removal: %s", sections_to_remove)
         
@@ -2738,6 +2736,9 @@ def test_bug_9825_navigate_between_sections(request, login_logout):
         logger.info("  ✅ Successfully navigated to Draft page (after clicking on Generate draft)")
         
         page.wait_for_timeout(1000)
+        
+        duration = time.time() - start
+        logger.info("Execution Time for Step 6: %.2fs", duration)
         
         logger.info("\n" + "="*80)
         logger.info("✅ TC 10157 Test Summary - Navigate between sections")
@@ -3398,7 +3399,7 @@ def test_bug_10177_edit_delete_icons_disabled_during_response(login_logout, requ
                 try:
                     threads.first.wait_for(state="visible", timeout=10000)
                     logger.info("✅ Chat history created and displayed with %d thread(s)", threads.count())
-                except:
+                except Exception:
                     logger.error("❌ Chat history threads not visible after creation")
                     # Try alternative locator
                     threads_alt = page.locator('div[data-list-index]')
@@ -3448,7 +3449,7 @@ def test_bug_10177_edit_delete_icons_disabled_during_response(login_logout, requ
         try:
             delete_icon.wait_for(state="visible", timeout=2000)
             is_delete_visible = True
-        except:
+        except Exception:
             is_delete_visible = False
         
         is_delete_enabled = delete_icon.is_enabled() if is_delete_visible else False
@@ -3460,7 +3461,7 @@ def test_bug_10177_edit_delete_icons_disabled_during_response(login_logout, requ
         try:
             edit_icon.wait_for(state="visible", timeout=2000)
             is_edit_visible = True
-        except:
+        except Exception:
             is_edit_visible = False
         
         is_edit_enabled = edit_icon.is_enabled() if is_edit_visible else False
@@ -3914,7 +3915,9 @@ def test_bug_16106_tooltip_on_chat_history_hover(login_logout, request):
         with check:
             assert thread_count > 0, "No chat history threads found to hover over"
         
-        if thread_count > 0:
+        if thread_count <= 0:
+            logger.warning("Skipping hover action: no chat history threads available.")
+        else:
             # Hover over the first chat thread to trigger tooltip
             first_thread = history_threads.nth(0)
             first_thread.hover()
@@ -3989,8 +3992,6 @@ def test_bug_16106_tooltip_on_chat_history_hover(login_logout, request):
         if tooltip_found:
             logger.info("✅ Tooltip displayed successfully on chat history hover")
             logger.info("Tooltip text length: %d characters", len(tooltip_text))
-        else:
-            logger.error("❌ BUG FOUND: No tooltip displayed when hovering over chat history")
         
         duration = time.time() - start
         logger.info("Execution Time for 'Verify tooltip': %.2fs", duration)
@@ -4007,7 +4008,7 @@ def test_bug_16106_tooltip_on_chat_history_hover(login_logout, request):
                 page.keyboard.press("Escape")
                 page.wait_for_timeout(1000)
                 logger.info("Closed chat history using Escape key")
-            except:
+            except Exception:
                 logger.warning("Chat history panel may still be open")
 
         logger.info("\n%s", "="*80)
@@ -4102,10 +4103,10 @@ def test_bug_26031_validate_empty_spaces_chat_input(login_logout, request):
                 assert current_responses_empty == initial_responses, \
                     f"BUG: System accepted empty query. Response count changed from {initial_responses} to {current_responses_empty}"
             
-            if current_responses_empty == initial_responses:
-                logger.info("✅ System did not accept empty query - no response generated")
-            else:
+            if current_responses_empty != initial_responses:
                 logger.error("❌ BUG: System accepted empty query and generated response")
+            else:
+                logger.info("✅ System did not accept empty query - no response generated")
         else:
             logger.info("✅ Send button is properly disabled for empty input")
         

@@ -19,7 +19,6 @@ HIGHLIGHT_BOX = (50, 70, 95)
 
 def draw_rounded_rect(draw, xy, radius, fill=None, outline=None, width=1):
     """Draw a rounded rectangle"""
-    x1, y1, x2, y2 = xy
     draw.rounded_rectangle(xy, radius=radius, fill=fill, outline=outline, width=width)
 
 def draw_service_box(draw, x, y, w, h, title, subtitle="", icon_type="default", highlight=False):
@@ -69,7 +68,7 @@ def draw_service_box(draw, x, y, w, h, title, subtitle="", icon_type="default", 
     try:
         font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 13)
         font_sub = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
-    except:
+    except Exception:
         font_title = ImageFont.load_default()
         font_sub = ImageFont.load_default()
     
@@ -113,7 +112,7 @@ def main():
     try:
         font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
         font_label = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 9)
-    except:
+    except OSError:
         font_title = ImageFont.load_default()
         font_label = ImageFont.load_default()
     
@@ -134,9 +133,7 @@ def main():
     
     COL1_X = 100
     COL2_X = 340
-    COL3_X = 580
     COL4_X = 820
-    COL5_X = 1100
     
     # === ROW 1: Frontend Tier ===
     # Container Registry
@@ -211,7 +208,7 @@ def main():
     # Copyright
     try:
         font_copy = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
-    except:
+    except Exception:
         font_copy = ImageFont.load_default()
     
     draw.text((50, HEIGHT-30), "© 2024 Microsoft Corporation All rights reserved.", fill=TEXT_GRAY, font=font_copy)

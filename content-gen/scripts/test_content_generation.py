@@ -12,7 +12,6 @@ Run with: python scripts/test_content_generation.py
 """
 
 import asyncio
-import json
 import sys
 import os
 from typing import Dict, Any

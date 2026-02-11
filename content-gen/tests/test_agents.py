@@ -2,10 +2,7 @@
 Unit tests for the Content Generation agents.
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-
-from backend.models import CreativeBrief, Product, ComplianceSeverity
+from backend.models import CreativeBrief, Product
 from backend.agents.text_content_agent import validate_text_compliance
 from backend.agents.compliance_agent import comprehensive_compliance_check
 

@@ -15,7 +15,7 @@ from diagrams import Diagram, Cluster, Edge
 from diagrams.azure.compute import ContainerInstances, AppServices, ContainerRegistries
 from diagrams.azure.database import CosmosDb, BlobStorage
 from diagrams.azure.ml import CognitiveServices
-from diagrams.azure.network import VirtualNetworks, PrivateEndpoint, DNSZones
+from diagrams.azure.network import PrivateEndpoint
 from diagrams.azure.analytics import AnalysisServices
 from diagrams.onprem.client import User
 

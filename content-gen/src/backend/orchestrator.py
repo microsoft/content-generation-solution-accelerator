@@ -1511,8 +1511,13 @@ Use the detailed visual descriptions above to ensure accurate color reproduction
                                     try:
                                         prompt_data = json.loads(json_match.group(1))
                                         prompt_text = prompt_data.get('prompt', prompt_data.get('image_prompt', prompt_text))
-                                    except:
-                                        pass
+                                    except Exception as parse_error:
+                                        # Best-effort JSON extraction from markdown code block; on failure,
+                                        # fall back to the original prompt_text without interrupting image generation.
+                                        logger.debug(
+                                            "Failed to parse JSON from markdown code block for image prompt: %s",
+                                            parse_error,
+                                        )
                         
                         # Build product description for DALL-E context
                         # Include detailed image descriptions if available for better color accuracy
@@ -1576,7 +1581,13 @@ Check against brand guidelines and flag any issues.
                     for v in results["violations"]
                 )
             except (json.JSONDecodeError, KeyError):
-                pass
+                # If the compliance response is not valid JSON or missing expected keys,
+                # continue without structured violations data but log for observability.
+                logger.debug(
+                    "Could not parse structured compliance violations from response; "
+                    "proceeding without 'violations' / 'requires_modification'.",
+                    exc_info=True,
+                )
                 
         except Exception as e:
             logger.exception(f"Error generating content: {e}")
@@ -1744,8 +1755,11 @@ Return JSON with:
                                 prompt_data = json.loads(json_match.group(1))
                                 prompt_text = prompt_data.get('prompt', prompt_text)
                                 change_summary = prompt_data.get('change_summary', modification_request)
-                            except:
-                                pass
+                            except Exception as parse_error:
+                                logger.debug(
+                                    "Failed to parse JSON from image modification response fallback: %s",
+                                    parse_error,
+                                )
                 
                 results["image_prompt"] = prompt_text
                 results["message"] = f"Regenerating image: {change_summary}"

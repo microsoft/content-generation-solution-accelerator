@@ -7,7 +7,6 @@ import {
   DialogType,
   IconButton,
   ITextField,
-  ITooltipHostStyles,
   List,
   PrimaryButton,
   Separator,

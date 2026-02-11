@@ -28,7 +28,6 @@ Usage:
 import asyncio
 import argparse
 import json
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -288,7 +287,7 @@ async def main():
     
     # Generate content
     try:
-        result = await generate_content_sample(
+        await generate_content_sample(
             brief=brief,
             products=products,
             generate_images=not args.no_images,
