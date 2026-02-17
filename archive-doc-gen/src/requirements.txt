@@ -9,7 +9,7 @@ azure-ai-projects==1.0.0
 azure-ai-inference==1.0.0b9
 quart==0.20.0
 uvicorn==0.40.0
-aiohttp==3.13.2
+aiohttp==3.13.3
 gunicorn==23.0.0
 pydantic==2.12.5
 pydantic-settings==2.12.0
