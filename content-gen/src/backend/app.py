@@ -992,13 +992,38 @@ async def regenerate_content():
                 existing_content = raw_content if isinstance(raw_content, dict) else {}
                 old_image_url = existing_content.get("image_url")
 
+                # If the product/color changed, update text_content to
+                # replace occurrences of the old product name with the new one
+                # so the body copy, headline, tagline etc. reflect the latest color.
+                updated_text_content = existing_content.get("text_content")
+                old_selected = existing_content.get("selected_products", [])
+                new_selected = products_data if products_data else old_selected
+                if old_selected and new_selected:
+                    old_name = (old_selected[0].get("product_name", "") if isinstance(old_selected[0], dict) else "") if old_selected else ""
+                    new_name = (new_selected[0].get("product_name", "") if isinstance(new_selected[0], dict) else "") if new_selected else ""
+                    if old_name and new_name and old_name.lower() != new_name.lower() and updated_text_content:
+                        if isinstance(updated_text_content, dict):
+                            import re as _re
+                            pattern = _re.compile(_re.escape(old_name), _re.IGNORECASE)
+                            for field in ("headline", "body", "tagline", "cta"):
+                                val = updated_text_content.get(field)
+                                if val and isinstance(val, str):
+                                    updated_text_content[field] = pattern.sub(new_name, val)
+                        elif isinstance(updated_text_content, str):
+                            import re as _re
+                            pattern = _re.compile(_re.escape(old_name), _re.IGNORECASE)
+                            updated_text_content = pattern.sub(new_name, updated_text_content)
+                        logger.info(f"Replaced '{old_name}' with '{new_name}' in text_content")
+
                 updated_content = {
                     **existing_content,
                     "image_url": new_image_url if new_image_url else old_image_url,
                     "image_prompt": new_image_prompt if new_image_prompt else existing_content.get("image_prompt"),
                     "image_revised_prompt": new_image_revised_prompt if new_image_revised_prompt else existing_content.get("image_revised_prompt"),
-                    "selected_products": products_data if products_data else existing_content.get("selected_products", []),
+                    "selected_products": new_selected,
                 }
+                if updated_text_content is not None:
+                    updated_content["text_content"] = updated_text_content
 
                 await cosmos_service.save_generated_content(
                     conversation_id=conversation_id,

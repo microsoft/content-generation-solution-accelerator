@@ -360,8 +360,27 @@ function App() {
                 
                 // Update generatedContent with new image
                 if (parsedContent.image_url || parsedContent.image_base64) {
+                  // Build updated text_content: if the product/color changed,
+                  // replace the old product name in all text fields so the
+                  // body copy, headline, tagline etc. reflect the new color.
+                  let updatedTextContent = generatedContent.text_content;
+                  if (mentionedProduct && selectedProducts[0] && generatedContent.text_content) {
+                    const oldName = selectedProducts[0].product_name;
+                    const newName = mentionedProduct.product_name;
+                    if (oldName && newName && oldName.toLowerCase() !== newName.toLowerCase()) {
+                      const regex = new RegExp(oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                      updatedTextContent = {
+                        headline: generatedContent.text_content.headline?.replace(regex, newName),
+                        body: generatedContent.text_content.body?.replace(regex, newName),
+                        cta_text: generatedContent.text_content.cta_text?.replace(regex, newName),
+                        tagline: generatedContent.text_content.tagline?.replace(regex, newName),
+                      };
+                    }
+                  }
+
                   responseData = {
                     ...generatedContent,
+                    text_content: updatedTextContent,
                     image_content: {
                       ...generatedContent.image_content,
                       image_url: parsedContent.image_url || generatedContent.image_content?.image_url,
