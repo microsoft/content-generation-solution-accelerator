@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     env:
-      accelerator_name: "DocGen"
+      accelerator_name: "Content Gen"
     steps:
       - name: Validate Workflow Input Parameters
         shell: bash
