@@ -246,7 +246,7 @@ jobs:
           # Set ACR name only when building Docker image
           if [[ "$BUILD_DOCKER_IMAGE" == "true" ]]; then
             # Extract ACR name from login server and set as environment variable
-            ACR_NAME="${{ secrets.ACR_TEST_USERNAME }}"
+            ACR_NAME=$(echo "${{ secrets.ACR_TEST_LOGIN_SERVER }}" | cut -d'.' -f1)
             azd env set ACR_NAME="$ACR_NAME"
             echo "Set ACR name to: $ACR_NAME"
           else
