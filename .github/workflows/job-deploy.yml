@@ -77,7 +77,7 @@ on:
         value: ${{ jobs.azure-setup.outputs.RESOURCE_GROUP_NAME }}
       WEB_APPURL:
         description: "Container Web App URL"
-        value: ${{ jobs.deploy-linux.outputs.WEB_APPURL || jobs.deploy-windows.outputs.WEB_APPURL || jobs.deploy-devcontainer.outputs.WEB_APPURL }}
+        value: ${{ jobs.deploy-linux.outputs.WEB_APPURL || jobs.deploy-windows.outputs.WEB_APPURL }}
       ENV_NAME:
         description: "Environment Name"
         value: ${{ jobs.azure-setup.outputs.ENV_NAME }}
@@ -103,16 +103,13 @@ env:
   CLEANUP_RESOURCES: ${{ inputs.trigger_type != 'workflow_dispatch' || inputs.cleanup_resources }}
   RUN_E2E_TESTS: ${{ inputs.trigger_type == 'workflow_dispatch' && (inputs.run_e2e_tests || 'GoldenPath-Testing') || 'GoldenPath-Testing' }}
   BUILD_DOCKER_IMAGE: ${{ inputs.trigger_type == 'workflow_dispatch' && (inputs.build_docker_image || false) || false }}
-permissions:
-  contents: read
-  actions: read
-  packages: write  # Required by job-deploy-devcontainer to push devcontainer image to GHCR
-  
+
 jobs:
   azure-setup:
     name: Azure Setup
     if: inputs.trigger_type != 'workflow_dispatch' || inputs.existing_webapp_url == '' || inputs.existing_webapp_url == null
     runs-on: ubuntu-latest
+    environment: production
     outputs:
       RESOURCE_GROUP_NAME: ${{ steps.check_create_rg.outputs.RESOURCE_GROUP_NAME }}
       ENV_NAME: ${{ steps.generate_env_name.outputs.ENV_NAME }}
@@ -155,7 +152,7 @@ jobs:
           fi
           
           # Validate runner_os (required - must be specific values)
-          ALLOWED_RUNNER_OS=("ubuntu-latest" "windows-latest" "devcontainer")
+          ALLOWED_RUNNER_OS=("ubuntu-latest" "windows-latest")
           if [[ -z "$INPUT_RUNNER_OS" ]]; then
             echo "❌ ERROR: runner_os is required but was not provided"
             VALIDATION_FAILED=true
@@ -325,18 +322,16 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Login to Azure
-        shell: bash
-        run: |
-          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Login to Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       
       - name: Run Quota Check
         id: quota-check
         env:
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           GPT_MIN_CAPACITY: ${{ env.GPT_MIN_CAPACITY }}
           IMAGE_MODEL_CHOICE: ${{ inputs.image_model_choice || 'gpt-image-1' }}
@@ -664,24 +659,6 @@ jobs:
     needs: azure-setup
     if: inputs.runner_os == 'windows-latest' && !cancelled() && needs.azure-setup.result == 'success'
     uses: ./.github/workflows/job-deploy-windows.yml
-    with:
-      ENV_NAME: ${{ needs.azure-setup.outputs.ENV_NAME }}
-      AZURE_ENV_OPENAI_LOCATION: ${{ needs.azure-setup.outputs.AZURE_ENV_OPENAI_LOCATION }}
-      AZURE_LOCATION: ${{ needs.azure-setup.outputs.AZURE_LOCATION }}
-      RESOURCE_GROUP_NAME: ${{ needs.azure-setup.outputs.RESOURCE_GROUP_NAME }}
-      IMAGE_TAG: ${{ needs.azure-setup.outputs.IMAGE_TAG }}
-      BUILD_DOCKER_IMAGE: ${{ inputs.build_docker_image || 'false' }}
-      EXP: ${{ needs.azure-setup.outputs.EXP_ENABLED }}
-      WAF_ENABLED: ${{ inputs.waf_enabled == true && 'true' || 'false' }}
-      AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID: ${{ inputs.AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID }}
-      AZURE_EXISTING_AI_PROJECT_RESOURCE_ID: ${{ inputs.AZURE_EXISTING_AI_PROJECT_RESOURCE_ID }}
-    secrets: inherit
-
-  deploy-devcontainer:
-    name: Deploy on DevContainer
-    needs: azure-setup
-    if: inputs.runner_os == 'devcontainer' && !cancelled() && needs.azure-setup.result == 'success'
-    uses: ./.github/workflows/job-deploy-devcontainer.yml
     with:
       ENV_NAME: ${{ needs.azure-setup.outputs.ENV_NAME }}
       AZURE_ENV_OPENAI_LOCATION: ${{ needs.azure-setup.outputs.AZURE_ENV_OPENAI_LOCATION }}

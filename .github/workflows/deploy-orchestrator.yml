@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       runner_os:
-        description: 'Runner OS (ubuntu-latest, windows-latest, or devcontainer)'
+        description: 'Runner OS (ubuntu-latest or windows-latest)'
         required: true
         type: string
       azure_location:
@@ -69,11 +69,7 @@ on:
 
 env:
   AZURE_DEV_COLLECT_TELEMETRY: ${{ vars.AZURE_DEV_COLLECT_TELEMETRY }}
-permissions:
-  contents: read
-  actions: read
-  packages: write  # Required by job-deploy → job-deploy-devcontainer to push devcontainer image to GHCR
-  
+
 jobs:
   docker-build:
     uses: ./.github/workflows/job-docker-build.yml
