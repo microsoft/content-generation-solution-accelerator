@@ -27,7 +27,6 @@ on:
         type: choice
         options:
           - 'codespace'
-          - 'Devcontainer'
           - 'Local'
         default: 'codespace'
 
@@ -116,7 +115,8 @@ on:
 permissions:
   contents: read
   actions: read
-  packages: write  # Required by deploy-orchestrator → job-deploy → job-deploy-devcontainer for GHCR
+  id-token: write  # Required for OIDC-based Azure authentication
+  packages: write  # Required for GHCR operations
 jobs:
   validate-inputs:
     runs-on: ubuntu-latest
@@ -157,8 +157,8 @@ jobs:
           
           # Validate runner_os (specific allowed values) and derive actual runner
           RUNNER_OS_INPUT="${INPUT_RUNNER_OS:-codespace}"
-          if [[ "$RUNNER_OS_INPUT" != "codespace" && "$RUNNER_OS_INPUT" != "Devcontainer" && "$RUNNER_OS_INPUT" != "Local" ]]; then
-            echo "❌ ERROR: runner_os must be one of: codespace, Devcontainer, Local, got: '$RUNNER_OS_INPUT'"
+          if [[ "$RUNNER_OS_INPUT" != "codespace" && "$RUNNER_OS_INPUT" != "Local" ]]; then
+            echo "❌ ERROR: runner_os must be one of: codespace, Local, got: '$RUNNER_OS_INPUT'"
             VALIDATION_FAILED=true
           else
             echo "✅ runner_os: '$RUNNER_OS_INPUT' is valid"
@@ -167,8 +167,6 @@ jobs:
           # Derive actual runner from runner_os input
           if [[ "$RUNNER_OS_INPUT" == "codespace" ]]; then
             RUNNER_OS="ubuntu-latest"
-          elif [[ "$RUNNER_OS_INPUT" == "Devcontainer" ]]; then
-            RUNNER_OS="devcontainer"
           else
             RUNNER_OS="windows-latest"
           fi

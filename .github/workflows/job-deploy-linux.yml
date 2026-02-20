@@ -38,13 +38,11 @@ on:
       WEB_APPURL:
         description: "Container Web App URL"
         value: ${{ jobs.deploy-linux.outputs.WEB_APP_URL }}
-permissions:
-  contents: read
-  actions: read
-  
+
 jobs:
   deploy-linux:
     runs-on: ubuntu-latest
+    environment: production
     env:
       AZURE_DEV_COLLECT_TELEMETRY: ${{ vars.AZURE_DEV_COLLECT_TELEMETRY }}
     outputs:
@@ -200,13 +198,17 @@ jobs:
       - name: Install azd
         uses: Azure/setup-azd@v2
           
-      - name: Login to AZD
-        id: login-azure
+      - name: Login to Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to AZD (OIDC)
         shell: bash
         run: |
-          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          azd auth login --client-id ${{ secrets.AZURE_CLIENT_ID }} --client-secret ${{ secrets.AZURE_CLIENT_SECRET }} --tenant-id ${{ secrets.AZURE_TENANT_ID }}
+          azd auth login --client-id ${{ secrets.AZURE_CLIENT_ID }} --federated-credential-provider github --tenant-id ${{ secrets.AZURE_TENANT_ID }}
 
       - name: Deploy using azd up and extract values (Linux)
         id: get_output_linux
@@ -244,7 +246,7 @@ jobs:
           # Set ACR name only when building Docker image
           if [[ "$BUILD_DOCKER_IMAGE" == "true" ]]; then
             # Extract ACR name from login server and set as environment variable
-            ACR_NAME="${{ secrets.ACR_TEST_USERNAME }}"
+            ACR_NAME=$(echo "${{ secrets.ACR_TEST_LOGIN_SERVER }}" | cut -d'.' -f1)
             azd env set ACR_NAME="$ACR_NAME"
             echo "Set ACR name to: $ACR_NAME"
           else

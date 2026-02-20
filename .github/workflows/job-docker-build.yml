@@ -19,14 +19,12 @@ on:
 
 env:
   BRANCH_NAME: ${{ github.event.workflow_run.head_branch || github.head_ref || github.ref_name }}
-permissions:
-  contents: read
-  actions: read
-  
+
 jobs:
   docker-build:
     if: inputs.trigger_type == 'workflow_dispatch' && inputs.build_docker_image == true
     runs-on: ubuntu-latest
+    environment: production
     outputs:
       IMAGE_TAG: ${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}
     steps:
@@ -50,15 +48,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Azure Container Registry
-        uses: azure/docker-login@v2
+      - name: Login to Azure (OIDC)
+        uses: azure/login@v2
         with:
-          login-server: ${{ secrets.ACR_TEST_LOGIN_SERVER }}
-          username: ${{ secrets.ACR_TEST_USERNAME }}
-          password: ${{ secrets.ACR_TEST_PASSWORD }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build and Push Docker Image
-        id: build_push_image
+      - name: Log in to Azure Container Registry
+        shell: bash
+        run: az acr login --name ${{ secrets.ACR_TEST_LOGIN_SERVER }}
+
+      - name: Build and Push Docker Image for Frontend Server
+        id: build_push_frontend
         uses: docker/build-push-action@v6
         env:
           DOCKER_BUILD_SUMMARY: false
@@ -67,13 +69,26 @@ jobs:
           file: ./content-gen/src/app/WebApp.Dockerfile
           push: true
           tags: |
-            ${{ secrets.ACR_TEST_LOGIN_SERVER }}/webapp:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}
-            ${{ secrets.ACR_TEST_LOGIN_SERVER }}/webapp:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}_${{ github.run_number }}
+            ${{ secrets.ACR_TEST_LOGIN_SERVER }}/content-gen-app:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}
+            ${{ secrets.ACR_TEST_LOGIN_SERVER }}/content-gen-app:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}_${{ github.run_number }}
+
+      - name: Build and Push Docker Image for Backend Server
+        id: build_push_backend
+        uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_SUMMARY: false
+        with:
+          context: ./content-gen/src/backend
+          file: ./content-gen/src/backend/ApiApp.Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.ACR_TEST_LOGIN_SERVER }}/content-gen-api:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}
+            ${{ secrets.ACR_TEST_LOGIN_SERVER }}/content-gen-api:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}_${{ github.run_number }}
 
       - name: Verify Docker Image Build
         shell: bash
         run: |
-          echo "✅ Docker image successfully built and pushed"
+          echo "✅ Docker images successfully built and pushed"
           echo "Image tag: ${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}"
       
       - name: Generate Docker Build Summary
@@ -91,10 +106,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           if [[ "${{ job.status }}" == "success" ]]; then
             echo "### ✅ Build Details" >> $GITHUB_STEP_SUMMARY
-            echo "Successfully built and pushed one Docker image to ACR:" >> $GITHUB_STEP_SUMMARY
+            echo "Successfully built and pushed Docker images to ACR:" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Built Images:**" >> $GITHUB_STEP_SUMMARY
-            echo "- \`${ACR_NAME}.azurecr.io/webapp:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`${ACR_NAME}/content-gen-app:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`${ACR_NAME}/content-gen-api:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}\`" >> $GITHUB_STEP_SUMMARY
           else
             echo "### ❌ Build Failed" >> $GITHUB_STEP_SUMMARY
             echo "- Docker build process encountered an error" >> $GITHUB_STEP_SUMMARY
