@@ -22,11 +22,11 @@ var existingOpenAIEndpoint = useExistingAiFoundryAiProject
   : ''
 
 // Reference to cognitive service in current resource group for new projects
-resource cogServiceReference 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
+resource cogServiceReference 'Microsoft.CognitiveServices/accounts@2025-10-01-preview' existing = {
   name: aiServicesName
 }
 
-resource aiProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
+resource aiProject 'Microsoft.CognitiveServices/accounts/projects@2025-10-01-preview' = {
   parent: cogServiceReference
   name: name
   tags: tags
