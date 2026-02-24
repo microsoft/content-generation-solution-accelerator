@@ -37,7 +37,15 @@ The deployment should have created the following resources:
 - Azure Cosmos DB (product catalog and conversations)
 - Azure Blob Storage (product images and generated images)
 - Azure AI Search (product search index)
-- Azure Container Registry (container images)
+- User Assigned Managed Identity
+- App Service Plan
+
+**Optional resources** (depending on deployment parameters):
+- Log Analytics Workspace and Application Insights (if monitoring is enabled)
+- Virtual Network, Private DNS Zones, and Private Endpoints (if private networking is enabled)
+- Azure Bastion and Jumpbox VM (if enabled for private network administration)
+
+**Important:** The deployment references an **existing Azure Container Registry** (specified via the `acrName` parameter) that must contain pre-built container images (`content-gen-app` and `content-gen-api`). The ACR is not created by this deployment.
 
 ### 3. Required Tools
 
