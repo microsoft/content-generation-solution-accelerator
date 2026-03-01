@@ -6,7 +6,7 @@ quart-cors>=0.7.0
 hypercorn>=0.17.0
 
 # Microsoft Agent Framework
-agent-framework==1.0.0b260114  # Pinning this stable version
+agent-framework==1.0.0rc2  # Pinning this stable version
 
 # Azure SDKs
 azure-identity>=1.17.0
