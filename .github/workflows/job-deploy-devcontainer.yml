@@ -56,7 +56,7 @@ jobs:
       WEB_APPURL: ${{ steps.load_azd_outputs.outputs.WEB_APP_URL }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Validate Workflow Input Parameters
         shell: bash
