@@ -59,7 +59,7 @@ def add_client_secret(credential, app_id):
 
 
 def update_azd_env(name, val):
-    subprocess.run(f"azd env set {name} {val}", shell=True)
+    subprocess.run(["azd", "env", "set", name, val], shell=False, check=True)
 
 
 if __name__ == "__main__":

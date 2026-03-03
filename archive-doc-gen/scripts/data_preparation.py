@@ -152,9 +152,15 @@ def create_or_update_search_index(
     if not admin_key:
         admin_key = json.loads(
             subprocess.run(
-                f"az search admin-key show --subscription {subscription_id} --resource-group {resource_group} --service-name {service_name}",
-                shell=True,
+                [
+                    "az", "search", "admin-key", "show",
+                    "--subscription", subscription_id,
+                    "--resource-group", resource_group,
+                    "--service-name", service_name
+                ],
+                shell=False,
                 capture_output=True,
+                check=True,
             ).stdout
         )["primaryKey"]
 
@@ -312,9 +318,15 @@ def upload_documents_to_index(
     if not admin_key:
         admin_key = json.loads(
             subprocess.run(
-                f"az search admin-key show --subscription {subscription_id} --resource-group {resource_group} --service-name {service_name}",
-                shell=True,
+                [
+                    "az", "search", "admin-key", "show",
+                    "--subscription", subscription_id,
+                    "--resource-group", resource_group,
+                    "--service-name", service_name
+                ],
+                shell=False,
                 capture_output=True,
+                check=True,
             ).stdout
         )["primaryKey"]
 
@@ -349,9 +361,15 @@ def validate_index(service_name, subscription_id, resource_group, index_name):
     api_version = "2024-03-01-Preview"
     admin_key = json.loads(
         subprocess.run(
-            f"az search admin-key show --subscription {subscription_id} --resource-group {resource_group} --service-name {service_name}",
-            shell=True,
+            [
+                "az", "search", "admin-key", "show",
+                "--subscription", subscription_id,
+                "--resource-group", resource_group,
+                "--service-name", service_name
+            ],
+            shell=False,
             capture_output=True,
+            check=True,
         ).stdout
     )["primaryKey"]
 
