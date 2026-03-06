@@ -5,5 +5,4 @@
 -r ../src/backend/requirements.txt
 
 # Post-deploy script deps
-azure-search-documents>=11.6.0
 httpx>=0.28.0

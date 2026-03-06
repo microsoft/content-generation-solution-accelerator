@@ -164,6 +164,7 @@ class _AIFoundrySettings(BaseSettings):
         env_file=DOTENV_PATH,
         extra="ignore",
         env_ignore_empty=True,
+        protected_namespaces=(),
     )
 
     use_foundry: bool = Field(default=False, alias="USE_FOUNDRY")

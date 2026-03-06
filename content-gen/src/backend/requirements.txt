@@ -6,14 +6,19 @@ quart-cors>=0.7.0
 hypercorn>=0.17.0
 
 # Microsoft Agent Framework
-agent-framework==1.0.0b260114  # Pinning this stable version
+agent-framework-azure-ai==1.0.0b260114
+agent-framework-core==1.0.0b260114
+
+# OpenTelemetry (required by agent-framework)
+opentelemetry-semantic-conventions-ai==0.4.13
 
 # Azure SDKs
 azure-identity>=1.17.0
 azure-cosmos>=4.7.0
 azure-storage-blob>=12.22.0
+azure-search-documents>=11.4.0
 azure-ai-contentsafety>=1.0.0
-azure-ai-projects>=1.0.0b5  # Azure AI Foundry SDK (optional, for USE_FOUNDRY=true)
+azure-ai-projects==2.0.0b3  # Azure AI Foundry SDK (optional, for USE_FOUNDRY=true)
 
 # OpenAI
 openai>=1.45.0
