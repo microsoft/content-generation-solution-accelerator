@@ -31,9 +31,6 @@ param environmentVariables array
 @description('Optional. Enable telemetry.')
 param enableTelemetry bool = true
 
-@description('Required. Container registry server.')
-param registryServer string
-
 @description('Optional. User-assigned managed identity resource ID for ACR pull.')
 param userAssignedIdentityResourceId string = ''
 
@@ -56,7 +53,7 @@ resource avmTelemetry 'Microsoft.Resources/deployments@2024-03-01' = if (enableT
   }
 }
 
-resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2023-05-01' = {
+resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2025-09-01' = {
   name: name
   location: location
   tags: tags
