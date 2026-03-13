@@ -34,7 +34,7 @@ class HomePage(BasePage):
     OLIVE_STONE_TEXT = "(//span[normalize-space()='Olive Stone'])[last()]"
     OBSIDIAN_TEXT = "(//span[normalize-space()='Obsidian Pearl'])[last()]"
     GENERATE_CONTENT_BUTTON = "//button[normalize-space()='Generate Content']"
-    ANALYZING_BRIEF_TEXT = "//span[contains(text(),'Analyzing creative brief..')]"
+    ANALYZING_BRIEF_TEXT = "//span[contains(text(),'Processing your request')]"
     GENERATED_CONTENT_TEXT_OLIVE = "//span[contains(.,'✨ Discover the serene elegance of Olive Stone.')]"
     GENERATED_CONTENT_TEXT_OBSIDIAN = "//span[contains(.,'✨ Discover the serene elegance of Obsidian Pearl.')]"
     PAINT_LIST = "//span[.='Here is the list of available paints:']"
