@@ -18,9 +18,9 @@ updates:
   # Python (pip) dependencies - grouped
   - package-ecosystem: "pip"
     directories:
-      - "/content-gen/src/backend"
-      - "/content-gen/infra/vscode_web"
-      - "/content-gen/scripts"
+      - "/src/backend"
+      - "/infra/vscode_web"
+      - "/scripts"
     schedule:
       interval: "monthly"
     target-branch: "dependabotchanges"
@@ -35,8 +35,8 @@ updates:
   # npm dependencies - grouped
   - package-ecosystem: "npm"
     directories:
-      - "/content-gen/src/app/frontend"
-      - "/content-gen/src/app/frontend-server"
+      - "/src/app/frontend"
+      - "/src/app/frontend-server"
     schedule:
       interval: "monthly"
     target-branch: "dependabotchanges"

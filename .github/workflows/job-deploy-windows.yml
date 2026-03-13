@@ -191,7 +191,7 @@ jobs:
           WAF_ENABLED: ${{ inputs.WAF_ENABLED }}
         run: |
           if [[ "$WAF_ENABLED" == "true" ]]; then
-            cp content-gen/infra/main.waf.parameters.json content-gen/infra/main.parameters.json
+            cp infra/main.waf.parameters.json infra/main.parameters.json
             echo "✅ Successfully copied WAF parameters to main parameters file"
           else
             echo "🔧 Configuring Non-WAF deployment - using default main.parameters.json..."
@@ -228,9 +228,6 @@ jobs:
           INPUT_AZURE_EXISTING_AI_PROJECT_RESOURCE_ID: ${{ inputs.AZURE_EXISTING_AI_PROJECT_RESOURCE_ID }}
         run: |
           $ErrorActionPreference = "Stop"
-
-          # Change to content-gen directory where azure.yaml lives
-          Push-Location content-gen
 
           Write-Host "Creating environment..."
           azd env new $env:ENV_NAME --no-prompt

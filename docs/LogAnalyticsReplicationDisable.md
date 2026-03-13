@@ -25,4 +25,4 @@ You can safely delete:
 - The resource group (manual), or
 - All provisioned resources via `azd down`
 
-Return to: [Deployment Guide](../content-gen/docs/DEPLOYMENT.md)
+Return to: [Deployment Guide](DEPLOYMENT.md)

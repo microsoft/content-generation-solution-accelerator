@@ -36,15 +36,15 @@ eggs/
 *.swo
 
 # Node
-/content-gen/src/app/frontend/node_modules/
-/content-gen/src/app/frontend-server/node_modules/
-/content-gen/src/app/frontend-server/static/
-/content-gen/src/app/frontend-server/*.zip
+/src/app/frontend/node_modules/
+/src/app/frontend-server/node_modules/
+/src/app/frontend-server/static/
+/src/app/frontend-server/*.zip
 node_modules/
 
 # Build output
-/content-gen/src/app/static/
-/content-gen/src/app/frontend/dist/
+/src/app/static/
+/src/app/frontend/dist/
 
 # Logs
 *.log

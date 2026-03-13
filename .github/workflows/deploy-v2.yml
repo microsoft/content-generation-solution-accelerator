@@ -4,12 +4,12 @@ on:
     branches:
       - main
     paths:
-      - 'content-gen/src/**'
-      - '!content-gen/src/tests/**'
-      - 'content-gen/infra/**/*.bicep'
-      - 'content-gen/infra/**/*.json'
-      - 'content-gen/*.yaml'
-      - 'content-gen/scripts/**'
+      - 'src/**'
+      - '!src/tests/**'
+      - 'infra/**/*.bicep'
+      - 'infra/**/*.json'
+      - '*.yaml'
+      - 'scripts/**'
       - '.github/workflows/deploy-*.yml'
   workflow_run:
     workflows: ["Build Docker and Optional Push"]
@@ -103,10 +103,10 @@ on:
       image_model_choice:
         description: 'Image Model to Deploy'
         required: false
-        default: 'gpt-image-1'
+        default: 'gpt-image-1-mini'
         type: choice
         options:
-          - 'gpt-image-1'
+          - 'gpt-image-1-mini'
           - 'gpt-image-1.5'
           - 'none'
         
@@ -307,8 +307,8 @@ jobs:
           echo "existing_webapp_url=$INPUT_EXISTING_WEBAPP_URL" >> $GITHUB_OUTPUT
           
           # Validate and output image_model_choice
-          IMAGE_MODEL="${INPUT_IMAGE_MODEL_CHOICE:-gpt-image-1}"
-          ALLOWED_MODELS=("gpt-image-1" "gpt-image-1.5" "none")
+          IMAGE_MODEL="${INPUT_IMAGE_MODEL_CHOICE:-gpt-image-1-mini}"
+          ALLOWED_MODELS=("gpt-image-1-mini" "gpt-image-1.5" "none")
           if [[ ! " ${ALLOWED_MODELS[@]} " =~ " ${IMAGE_MODEL} " ]]; then
             echo "❌ ERROR: image_model_choice '$IMAGE_MODEL' is invalid. Allowed: ${ALLOWED_MODELS[*]}"
             exit 1
@@ -333,5 +333,5 @@ jobs:
       AZURE_EXISTING_AI_PROJECT_RESOURCE_ID: ${{ needs.validate-inputs.outputs.azure_existing_ai_project_resource_id || '' }}
       existing_webapp_url: ${{ needs.validate-inputs.outputs.existing_webapp_url || '' }}
       trigger_type: ${{ github.event_name }}
-      image_model_choice: ${{ needs.validate-inputs.outputs.image_model_choice || 'gpt-image-1' }}
+      image_model_choice: ${{ needs.validate-inputs.outputs.image_model_choice || 'gpt-image-1-mini' }}
     secrets: inherit

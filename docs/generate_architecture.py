@@ -2,7 +2,7 @@
 Generate Solution Architecture Diagram for Content Generation Accelerator
 
 Architecture based on main.bicep:
-- AI Services: Azure AI Foundry with GPT-5.1 and GPT-Image-1 models
+- AI Services: Azure AI Foundry with GPT-5.1 and GPT-Image-1-mini models
 - AI Search: Azure AI Search with semantic search for product discovery
 - Storage: Blob Storage with product-images, generated-images, data containers
 - Cosmos DB: NoSQL database for conversations and products
@@ -75,7 +75,7 @@ with Diagram(
         # Row 3: AI Services (grouped together to avoid crossings)
         with Cluster("Azure AI Foundry", graph_attr={"bgcolor": "#2d4a5e"}):
             aoai_gpt = CognitiveServices("GPT-5.1\n(Content Gen)")
-            aoai_image = CognitiveServices("GPT-Image-1\n(Image Gen)")
+            aoai_image = CognitiveServices("GPT-Image-1-mini\n(Image Gen)")
         
         with Cluster("Search", graph_attr={"bgcolor": "#2d4a5e"}):
             ai_search = AnalysisServices("Azure AI Search\n(Product Index)")

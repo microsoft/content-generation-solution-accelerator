@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'content-gen/azure.yaml'
+      - 'azure.yaml'
 
 permissions:
   contents: read
@@ -22,13 +22,13 @@ jobs:
 
       - name: Check for required metadata template line
         run: |
-          if grep -E '^\s*#\s*template:\s*content-generation@' content-gen/azure.yaml; then
-            echo "ERROR: 'template' line is commented out in content-gen/azure.yaml! Please uncomment template line."
+          if grep -E '^\s*#\s*template:\s*content-generation@' azure.yaml; then
+            echo "ERROR: 'template' line is commented out in azure.yaml! Please uncomment template line."
             exit 1
           fi
 
-          if ! grep -E '^\s*template:\s*content-generation@' content-gen/azure.yaml; then
-            echo "ERROR: Required 'template' line is missing in content-gen/azure.yaml! Please add template line for telemetry."
+          if ! grep -E '^\s*template:\s*content-generation@' azure.yaml; then
+            echo "ERROR: Required 'template' line is missing in azure.yaml! Please add template line for telemetry."
             exit 1
           fi
           echo "template line is present and not commented."

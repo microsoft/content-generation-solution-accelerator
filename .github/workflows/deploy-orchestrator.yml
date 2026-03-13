@@ -62,9 +62,9 @@ on:
         required: true
         type: string
       image_model_choice:
-        description: 'Image model to deploy (gpt-image-1, gpt-image-1.5, none)'
+        description: 'Image model to deploy (gpt-image-1-mini, gpt-image-1.5, none)'
         required: false
-        default: 'gpt-image-1'
+        default: 'gpt-image-1-mini'
         type: string
 
 env:

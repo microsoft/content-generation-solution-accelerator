@@ -51,7 +51,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r content-gen/tests/e2e-test/requirements.txt
+          pip install -r tests/e2e-test/requirements.txt
 
       - name: Ensure browsers are installed
         run: python -m playwright install --with-deps chromium
@@ -98,7 +98,7 @@ jobs:
           else
             xvfb-run pytest --html=report/report.html --self-contained-html
           fi
-        working-directory: content-gen/tests/e2e-test
+        working-directory: tests/e2e-test
         continue-on-error: true
 
       - name: Sleep for 30 seconds
@@ -115,7 +115,7 @@ jobs:
           else
             xvfb-run pytest --html=report/report.html --self-contained-html
           fi
-        working-directory: content-gen/tests/e2e-test
+        working-directory: tests/e2e-test
         continue-on-error: true
 
       - name: Sleep for 60 seconds
@@ -132,7 +132,7 @@ jobs:
           else
             xvfb-run pytest --html=report/report.html --self-contained-html
           fi
-        working-directory: content-gen/tests/e2e-test
+        working-directory: tests/e2e-test
 
       - name: Upload test report
         id: upload_report
@@ -141,9 +141,9 @@ jobs:
         with:
           name: test-report
           path: | 
-            content-gen/tests/e2e-test/report/*
-            content-gen/tests/e2e-test/tests/screenshots/*
-            content-gen/tests/e2e-test/screenshots/*
+            tests/e2e-test/report/*
+            tests/e2e-test/tests/screenshots/*
+            tests/e2e-test/screenshots/*
 
       - name: Generate E2E Test Summary
         if: always()

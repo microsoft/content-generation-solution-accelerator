@@ -41,6 +41,8 @@ The sample data includes synthetic product catalogs and brand guidelines. The da
 
 <br/>
 
+## Features
+
 ### Key features
 <details open>
   <summary>Click to learn more about the key features this solution enables</summary>
@@ -60,6 +62,9 @@ The sample data includes synthetic product catalogs and brand guidelines. The da
 </details>
 
 <br /><br />
+
+## Getting Started
+
 <h2><img src="./docs/images/readme/quick_deploy.png" width="48" />
 Quick deploy
 </h2>
@@ -69,7 +74,7 @@ Follow the quick deploy steps on the deployment guide to deploy this solution to
 
 > **Note:** This solution accelerator requires **Azure Developer CLI (azd) version 1.18.0 or higher**. Please ensure you have the latest version installed before proceeding with deployment. [Download azd here](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd).
 
-[Click here to launch the deployment guide](./content-gen/docs/DEPLOYMENT.md)
+[Click here to launch the deployment guide](./docs/DEPLOYMENT.md)
 <br/><br/>
 
 | [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/microsoft/content-generation-solution-accelerator) | [![Open in Dev Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/microsoft/content-generation-solution-accelerator) | [![Open in Visual Studio Code Web](https://img.shields.io/static/v1?style=for-the-badge&label=Visual%20Studio%20Code%20(Web)&message=Open&color=blue&logo=visualstudiocode&logoColor=white)](https://vscode.dev/azure/?vscode-azure-exp=foundry&agentPayload=eyJiYXNlVXJsIjogImh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS9taWNyb3NvZnQvY29udGVudC1nZW5lcmF0aW9uLXNvbHV0aW9uLWFjY2VsZXJhdG9yL3JlZnMvaGVhZHMvbWFpbi9jb250ZW50LWdlbi9pbmZyYS92c2NvZGVfd2ViIiwgImluZGV4VXJsIjogIi9pbmRleC5qc29uIiwgInZhcmlhYmxlcyI6IHsiYWdlbnRJZCI6ICIiLCAiY29ubmVjdGlvblN0cmluZyI6ICIiLCAidGhyZWFkSWQiOiAiIiwgInVzZXJNZXNzYWdlIjogIiIsICJwbGF5Z3JvdW5kTmFtZSI6ICIiLCAibG9jYXRpb24iOiAiIiwgInN1YnNjcmlwdGlvbklkIjogIiIsICJyZXNvdXJjZUlkIjogIiIsICJwcm9qZWN0UmVzb3VyY2VJZCI6ICIiLCAiZW5kcG9pbnQiOiAiIn0sICJjb2RlUm91dGUiOiBbImFpLXByb2plY3RzLXNkayIsICJweXRob24iLCAiZGVmYXVsdC1henVyZS1hdXRoIiwgImVuZHBvaW50Il19) |
@@ -78,13 +83,15 @@ Follow the quick deploy steps on the deployment guide to deploy this solution to
 <br/>
 
 > ⚠️ **Important: Check Azure OpenAI Quota Availability**
- <br/>To ensure sufficient quota is available in your subscription, please follow [quota check instructions guide](./content-gen/docs/QuotaCheck.md) before you deploy the solution.
+ <br/>To ensure sufficient quota is available in your subscription, please follow [quota check instructions guide](./docs/QuotaCheck.md) before you deploy the solution.
 
 <br/>
 
+## Guidance
+
 ### Prerequisites and costs
 
-To deploy this solution accelerator, ensure you have access to an [Azure subscription](https://azure.microsoft.com/free/) with the necessary permissions to create **resource groups, resources, app registrations, and assign roles at the resource group level**. This should include Contributor role at the subscription level and  Role Based Access Control role on the subscription and/or resource group level. Follow the steps in [Azure Account Set Up](./content-gen/docs/AzureAccountSetUp.md).
+To deploy this solution accelerator, ensure you have access to an [Azure subscription](https://azure.microsoft.com/free/) with the necessary permissions to create **resource groups, resources, app registrations, and assign roles at the resource group level**. This should include Contributor role at the subscription level and  Role Based Access Control role on the subscription and/or resource group level. Follow the steps in [Azure Account Set Up](./docs/AzureAccountSetUp.md).
 
 Check the [Azure Products by Region](https://azure.microsoft.com/en-us/explore/global-infrastructure/products-by-region/?products=all&regions=all) page and select a **region** where the following services are available.
 
@@ -98,11 +105,13 @@ _Note: This is not meant to outline all costs as selected SKUs, scaled use, cust
 
 <br/>
 
+## Resources
+
 | Product | Description | Cost |
 |---|---|---|
 | [Azure AI Foundry](https://learn.microsoft.com/en-us/azure/ai-foundry/) | Free tier. Build generative AI applications on an enterprise-grade platform. | [Pricing](https://azure.microsoft.com/pricing/details/ai-studio/) |
 | [Azure Storage Account](https://learn.microsoft.com/en-us/azure/storage/blobs/) | Standard tier, LRS. Pricing is based on storage and operations. Blob storage for product images and generated content. | [Pricing](https://azure.microsoft.com/pricing/details/storage/blobs/) |
-| [Azure AI Services](https://learn.microsoft.com/en-us/azure/ai-services/) | S0 tier, defaults to gpt-5.1 (GPT) and gpt-image-1 models. Pricing is based on token count. | [Pricing](https://azure.microsoft.com/pricing/details/cognitive-services/) |
+| [Azure AI Services](https://learn.microsoft.com/en-us/azure/ai-services/) | S0 tier, defaults to gpt-5.1 (GPT) and gpt-image-1-mini models. Pricing is based on token count. | [Pricing](https://azure.microsoft.com/pricing/details/cognitive-services/) |
 | [Azure Container Instance](https://learn.microsoft.com/en-us/azure/container-instances/) | Backend API hosting with private VNet integration. Pricing is based on resource allocation. | [Pricing](https://azure.microsoft.com/pricing/details/container-instances/) |
 | [Azure App Service](https://learn.microsoft.com/en-us/azure/app-service/) | B1 tier. Frontend hosting with Node.js proxy server. | [Pricing](https://azure.microsoft.com/pricing/details/app-service/) |
 | [Azure Container Registry](https://learn.microsoft.com/en-us/azure/container-registry/) | Basic tier. Build, store, and manage container images and artifacts in a private registry for all types of container deployments | [Pricing](https://azure.microsoft.com/pricing/details/container-registry/) |
@@ -160,6 +169,10 @@ Accelerate your marketing content creation by leveraging AI to interpret creativ
 Supporting documentation
 </h2>
 
+### Technical guide
+
+For comprehensive technical documentation including architecture, agent orchestration, configuration, and development setup, see the [Technical Guide](./docs/TECHNICAL_GUIDE.md).
+
 ### Security guidelines
 
 This template uses [Managed Identity](https://learn.microsoft.com/entra/identity/managed-identities-azure-resources/overview) for authentication between Azure services.
@@ -204,7 +217,7 @@ Have questions, find a bug, or want to request a feature? [Submit a new issue](h
 <br/>
 
 ## Responsible AI Transparency FAQ 
-Please refer to [Transparency FAQ](./content-gen/docs/TRANSPARENCY_FAQ.md) for responsible AI transparency details of this solution accelerator.
+Please refer to [Transparency FAQ](./docs/TRANSPARENCY_FAQ.md) for responsible AI transparency details of this solution accelerator.
 
 <br/>
 

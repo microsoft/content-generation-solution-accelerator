@@ -65,8 +65,8 @@ jobs:
         env:
           DOCKER_BUILD_SUMMARY: false
         with:
-          context: ./content-gen/src/app
-          file: ./content-gen/src/app/WebApp.Dockerfile
+          context: ./src/app
+          file: ./src/app/WebApp.Dockerfile
           push: true
           tags: |
             ${{ secrets.ACR_TEST_LOGIN_SERVER }}/content-gen-app:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}
@@ -78,8 +78,8 @@ jobs:
         env:
           DOCKER_BUILD_SUMMARY: false
         with:
-          context: ./content-gen/src/backend
-          file: ./content-gen/src/backend/ApiApp.Dockerfile
+          context: ./src/backend
+          file: ./src/backend/ApiApp.Dockerfile
           push: true
           tags: |
             ${{ secrets.ACR_TEST_LOGIN_SERVER }}/content-gen-api:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}

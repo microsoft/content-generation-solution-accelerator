@@ -7,7 +7,7 @@ on:
       - dev
     paths:
       - '**/*.py'
-      - 'content-gen/src/backend/requirements*.txt'
+      - 'src/backend/requirements*.txt'
       - '.github/workflows/test.yml'
   pull_request:
     types:
@@ -20,7 +20,7 @@ on:
       - dev
     paths:
       - '**/*.py'
-      - 'content-gen/src/backend/requirements*.txt'
+      - 'src/backend/requirements*.txt'
       - '.github/workflows/test.yml'
 
 permissions:
@@ -43,14 +43,14 @@ jobs:
       - name: Install Backend Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r content-gen/src/backend/requirements.txt
+          pip install -r src/backend/requirements.txt
           pip install pytest-cov
           pip install pytest-asyncio
 
       - name: Check if Backend Test Files Exist
         id: check_backend_tests
         run: |
-          if [ -z "$(find content-gen/src/tests -type f -name 'test_*.py' 2>/dev/null)" ]; then
+          if [ -z "$(find src/tests -type f -name 'test_*.py' 2>/dev/null)" ]; then
             echo "No backend test files found, skipping backend tests."
             echo "skip_backend_tests=true" >> $GITHUB_ENV
           else
@@ -61,7 +61,7 @@ jobs:
       - name: Run Backend Tests with Coverage
         if: env.skip_backend_tests == 'false'
         run: |
-          pytest --cov=. --cov-report=term-missing --cov-report=xml ./content-gen/src/tests
+          pytest --cov=. --cov-report=term-missing --cov-report=xml ./src/tests
 
       - name: Skip Backend Tests
         if: env.skip_backend_tests == 'true'

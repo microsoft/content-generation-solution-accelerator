@@ -67,9 +67,9 @@ on:
         default: ''
         type: string
       image_model_choice:
-        description: 'Image model to deploy (gpt-image-1, gpt-image-1.5, none)'
+        description: 'Image model to deploy (gpt-image-1-mini, gpt-image-1.5, none)'
         required: false
-        default: 'gpt-image-1'
+        default: 'gpt-image-1-mini'
         type: string
     outputs:
       RESOURCE_GROUP_NAME:
@@ -334,14 +334,14 @@ jobs:
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           GPT_MIN_CAPACITY: ${{ env.GPT_MIN_CAPACITY }}
-          IMAGE_MODEL_CHOICE: ${{ inputs.image_model_choice || 'gpt-image-1' }}
+          IMAGE_MODEL_CHOICE: ${{ inputs.image_model_choice || 'gpt-image-1-mini' }}
           IMAGE_MODEL_MIN_CAPACITY: ${{ env.IMAGE_MODEL_MIN_CAPACITY }}
           AZURE_REGIONS: ${{ vars.AZURE_REGIONS }}
         run: |
-          chmod +x content-gen/scripts/checkquota.sh
-          if ! content-gen/scripts/checkquota.sh; then
+          chmod +x scripts/checkquota.sh
+          if ! scripts/checkquota.sh; then
             # If quota check fails due to insufficient quota, set the flag
-            if grep -q "No region with sufficient quota found" content-gen/scripts/checkquota.sh; then
+            if grep -q "No region with sufficient quota found" scripts/checkquota.sh; then
               echo "QUOTA_FAILED=true" >> $GITHUB_ENV
             fi
             exit 1  # Fail the pipeline if any other failure occurs
