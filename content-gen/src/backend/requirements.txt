@@ -26,6 +26,11 @@ openai>=1.45.0
 # HTTP Client (for Foundry direct API calls)
 httpx>=0.27.0
 
+# Monitoring / Telemetry
+azure-monitor-opentelemetry>=1.6.0
+azure-monitor-events-extension>=0.1.0
+opentelemetry-instrumentation-asgi>=0.48b0
+
 # Data Validation
 pydantic>=2.8.0
 pydantic-settings>=2.4.0
