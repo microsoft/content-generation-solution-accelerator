@@ -1,26 +1,24 @@
+import { memo, useMemo } from 'react';
 import {
-  Card,
   Text,
   tokens,
 } from '@fluentui/react-components';
+import { SuggestionCard } from './SuggestionCard';
 import FirstPromptIcon from '../styles/images/firstprompt.png';
 import SecondPromptIcon from '../styles/images/secondprompt.png';
 
-interface SuggestionCard {
+interface SuggestionData {
   title: string;
-  prompt: string;
   icon: string;
 }
 
-const suggestions: SuggestionCard[] = [
+const suggestions: SuggestionData[] = [
   {
     title: "I need to create a social media post about paint products for home remodels. The campaign is titled \"Brighten Your Springtime\" and the audience is new homeowners. I need marketing copy plus an image. The image should be an informal living room with tasteful furnishings.",
-    prompt: "I need to create a social media post about paint products for home remodels. The campaign is titled \"Brighten Your Springtime\" and the audience is new homeowners. I need marketing copy plus an image. The image should be an informal living room with tasteful furnishings.",
     icon: FirstPromptIcon,
   },
   {
     title: "Generate a social media campaign with ad copy and an image. This is for \"Back to School\" and the audience is parents of school age children. Tone is playful and humorous. The image must have minimal kids accessories in a children's bedroom. Show the room in a wide view.",
-    prompt: "Generate a social media campaign with ad copy and an image. This is for \"Back to School\" and the audience is parents of school age children. Tone is playful and humorous. The image must have minimal kids accessories in a children's bedroom. Show the room in a wide view.",
     icon: SecondPromptIcon,
   }
 ];
@@ -30,8 +28,12 @@ interface WelcomeCardProps {
   currentInput?: string;
 }
 
-export function WelcomeCard({ onSuggestionClick, currentInput = '' }: WelcomeCardProps) {
-  const selectedIndex = suggestions.findIndex(s => s.prompt === currentInput);
+export const WelcomeCard = memo(function WelcomeCard({ onSuggestionClick, currentInput = '' }: WelcomeCardProps) {
+  const selectedIndex = useMemo(
+    () => suggestions.findIndex(s => s.title === currentInput),
+    [currentInput],
+  );
+
   return (
     <div style={{
       display: 'flex',
@@ -89,70 +91,18 @@ export function WelcomeCard({ onSuggestionClick, currentInput = '' }: WelcomeCar
           {suggestions.map((suggestion, index) => {
             const isSelected = index === selectedIndex;
             return (
-            <Card
+            <SuggestionCard
               key={index}
-              onClick={() => onSuggestionClick(suggestion.prompt)}
-              style={{
-                padding: 'clamp(12px, 2vw, 16px)',
-                cursor: 'pointer',
-                backgroundColor: isSelected ? tokens.colorBrandBackground2 : tokens.colorNeutralBackground1,
-                border: 'none',
-                borderRadius: '16px',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (!isSelected) {
-                  e.currentTarget.style.backgroundColor = tokens.colorBrandBackground2;
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isSelected) {
-                  e.currentTarget.style.backgroundColor = tokens.colorNeutralBackground1;
-                }
-              }}
-            >
-              <div style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'clamp(8px, 1.5vw, 12px)',
-              }}>
-                <div style={{ 
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 'clamp(32px, 5vw, 40px)',
-                  height: 'clamp(32px, 5vw, 40px)',
-                  minWidth: '32px',
-                  minHeight: '32px',
-                  flexShrink: 0,
-                }}>
-                  <img 
-                    src={suggestion.icon} 
-                    alt="Prompt icon" 
-                    style={{ 
-                      width: '100%', 
-                      height: '100%', 
-                      objectFit: 'contain' 
-                    }} 
-                  />
-                </div>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <Text 
-                    size={300} 
-                    block 
-                    style={{ 
-                      fontSize: 'clamp(13px, 1.8vw, 15px)',
-                    }}
-                  >
-                    {suggestion.title}
-                  </Text>
-                </div>
-              </div>
-            </Card>
+              title={suggestion.title}
+              icon={suggestion.icon}
+              isSelected={isSelected}
+              onClick={() => onSuggestionClick(suggestion.title)}
+            />
             );
           })}
         </div>
       </div>
     </div>
   );
-}
+});
+WelcomeCard.displayName = 'WelcomeCard';

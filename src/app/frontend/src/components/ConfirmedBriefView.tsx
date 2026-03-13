@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
   Text,
   Badge,
@@ -7,24 +8,13 @@ import {
   Checkmark20Regular,
 } from '@fluentui/react-icons';
 import type { CreativeBrief } from '../types';
+import { BRIEF_DISPLAY_ORDER } from '../utils';
 
 interface ConfirmedBriefViewProps {
   brief: CreativeBrief;
 }
 
-const briefFields: { key: keyof CreativeBrief; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'objectives', label: 'Objectives' },
-  { key: 'target_audience', label: 'Target Audience' },
-  { key: 'key_message', label: 'Key Message' },
-  { key: 'tone_and_style', label: 'Tone & Style' },
-  { key: 'deliverable', label: 'Deliverable' },
-  { key: 'timelines', label: 'Timelines' },
-  { key: 'visual_guidelines', label: 'Visual Guidelines' },
-  { key: 'cta', label: 'Call to Action' },
-];
-
-export function ConfirmedBriefView({ brief }: ConfirmedBriefViewProps) {
+export const ConfirmedBriefView = memo(function ConfirmedBriefView({ brief }: ConfirmedBriefViewProps) {
   return (
     <div className="message assistant" style={{ 
       width: '100%',
@@ -60,7 +50,7 @@ export function ConfirmedBriefView({ brief }: ConfirmedBriefViewProps) {
         paddingLeft: '8px',
         borderLeft: `2px solid ${tokens.colorBrandBackground}`,
       }}>
-        {briefFields.map(({ key, label }) => {
+        {BRIEF_DISPLAY_ORDER.map(({ key, label }) => {
           const value = brief[key];
           if (!value?.trim()) return null;
           
@@ -88,4 +78,5 @@ export function ConfirmedBriefView({ brief }: ConfirmedBriefViewProps) {
       </div>
     </div>
   );
-}
+});
+ConfirmedBriefView.displayName = 'ConfirmedBriefView';

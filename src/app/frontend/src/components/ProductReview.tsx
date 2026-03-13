@@ -1,3 +1,4 @@
+import { memo, useMemo, useCallback } from 'react';
 import {
   Button,
   Text,
@@ -5,41 +6,46 @@ import {
 } from '@fluentui/react-components';
 import {
   Sparkle20Regular,
-  Box20Regular,
 } from '@fluentui/react-icons';
 import type { Product } from '../types';
+import { AI_DISCLAIMER } from '../utils';
+import { ProductCard } from './ProductCard';
 
 interface ProductReviewProps {
   products: Product[];
   onConfirm: () => void;
-  onStartOver: () => void;
   isAwaitingResponse?: boolean;
   availableProducts?: Product[];
   onProductSelect?: (product: Product) => void;
   disabled?: boolean;
 }
 
-export function ProductReview({
+export const ProductReview = memo(function ProductReview({
   products,
   onConfirm,
-  onStartOver: _onStartOver,
   isAwaitingResponse = false,
   availableProducts = [],
   onProductSelect,
   disabled = false,
 }: ProductReviewProps) {
-  const displayProducts = availableProducts.length > 0 ? availableProducts : products;
-  const selectedProductIds = new Set(products.map(p => p.sku || p.product_name));
+  const displayProducts = useMemo(
+    () => availableProducts.length > 0 ? availableProducts : products,
+    [availableProducts, products],
+  );
+  const selectedProductIds = useMemo(
+    () => new Set(products.map(p => p.sku || p.product_name)),
+    [products],
+  );
 
-  const isProductSelected = (product: Product): boolean => {
+  const isProductSelected = useCallback((product: Product): boolean => {
     return selectedProductIds.has(product.sku || product.product_name);
-  };
+  }, [selectedProductIds]);
 
-  const handleProductClick = (product: Product) => {
+  const handleProductClick = useCallback((product: Product) => {
     if (onProductSelect) {
       onProductSelect(product);
     }
-  };
+  }, [onProductSelect]);
 
   return (
     <div className="message assistant" style={{ 
@@ -66,7 +72,7 @@ export function ProductReview({
           overflowY: 'auto',
         }}>
           {displayProducts.map((product, index) => (
-            <ProductCardGrid
+            <ProductCard
               key={product.sku || index}
               product={product}
               isSelected={isProductSelected(product)}
@@ -121,107 +127,10 @@ export function ProductReview({
         paddingTop: '8px',
       }}>
         <Text size={100} style={{ color: tokens.colorNeutralForeground4 }}>
-          AI-generated content may be incorrect
+          {AI_DISCLAIMER}
         </Text>
       </div>
     </div>
   );
-}
-
-interface ProductCardGridProps {
-  product: Product;
-  isSelected: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-}
-
-function ProductCardGrid({ product, isSelected, onClick, disabled = false }: ProductCardGridProps) {
-  return (
-    <div 
-      className={`product-card ${isSelected ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
-      onClick={disabled ? undefined : onClick}
-      style={{
-        display: 'flex',
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: '16px',
-        padding: '16px',
-        borderRadius: '8px',
-        border: isSelected ? `2px solid ${tokens.colorBrandStroke1}` : `1px dashed ${tokens.colorNeutralStroke2}`,
-        backgroundColor: isSelected ? tokens.colorBrandBackground2 : tokens.colorNeutralBackground1,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.6 : 1,
-        transition: 'all 0.15s ease-in-out',
-        pointerEvents: disabled ? 'none' : 'auto',
-      }}
-    >
-      {product.image_url ? (
-        <img
-          src={product.image_url}
-          alt={product.product_name}
-          style={{
-            width: '80px',
-            height: '80px',
-            objectFit: 'cover',
-            borderRadius: '8px',
-            border: `1px solid ${tokens.colorNeutralStroke2}`,
-            flexShrink: 0,
-          }}
-        />
-      ) : (
-        <div 
-          style={{
-            width: '80px',
-            height: '80px',
-            borderRadius: '8px',
-            backgroundColor: tokens.colorNeutralBackground3,
-            border: `1px solid ${tokens.colorNeutralStroke2}`,
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Box20Regular style={{ color: tokens.colorNeutralForeground3, fontSize: '24px' }} />
-        </div>
-      )}
-      
-      <div className="product-info" style={{ flex: 1, minWidth: 0 }}>
-        <Text 
-          weight="semibold" 
-          size={400}
-          style={{ 
-            display: 'block',
-            color: tokens.colorNeutralForeground1,
-            marginBottom: '4px',
-          }}
-        >
-          {product.product_name}
-        </Text>
-        <Text 
-          size={200}
-          style={{ 
-            display: 'block',
-            color: tokens.colorNeutralForeground3,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            marginBottom: '4px',
-          }}
-        >
-          {product.tags || product.description || 'soft white, airy, minimal, fresh'}
-        </Text>
-        <Text 
-          weight="semibold" 
-          size={300}
-          style={{ 
-            display: 'block',
-            color: tokens.colorNeutralForeground1,
-          }}
-        >
-          ${product.price?.toFixed(2) || '59.95'} USD
-        </Text>
-      </div>
-    </div>
-  );
-}
+});
+ProductReview.displayName = 'ProductReview';

@@ -1,9 +1,11 @@
+import { memo, useMemo } from 'react';
 import {
   Button,
   Text,
   tokens,
 } from '@fluentui/react-components';
 import type { CreativeBrief } from '../types';
+import { BRIEF_FIELD_LABELS, BRIEF_DISPLAY_ORDER, BRIEF_FIELD_KEYS, AI_DISCLAIMER } from '../utils';
 
 interface BriefReviewProps {
   brief: CreativeBrief;
@@ -12,47 +14,22 @@ interface BriefReviewProps {
   isAwaitingResponse?: boolean;
 }
 
-// Mapping of field keys to user-friendly labels for the 9 key areas
-const fieldLabels: Record<keyof CreativeBrief, string> = {
-  overview: 'Overview',
-  objectives: 'Objectives',
-  target_audience: 'Target Audience',
-  key_message: 'Key Message',
-  tone_and_style: 'Tone and Style',
-  deliverable: 'Deliverable',
-  timelines: 'Timelines',
-  visual_guidelines: 'Visual Guidelines',
-  cta: 'Call to Action',
-};
-
-export function BriefReview({
+export const BriefReview = memo(function BriefReview({
   brief,
   onConfirm,
   onStartOver,
   isAwaitingResponse = false,
 }: BriefReviewProps) {
-  const allFields: (keyof CreativeBrief)[] = [
-    'overview', 'objectives', 'target_audience', 'key_message', 
-    'tone_and_style', 'deliverable', 'timelines', 'visual_guidelines', 'cta'
-  ];
-  const populatedFields = allFields.filter(key => brief[key]?.trim()).length;
-  const missingFields = allFields.filter(key => !brief[key]?.trim());
+  const { populatedFields, missingFields, populatedDisplayFields } = useMemo(() => {
+    const populated = BRIEF_FIELD_KEYS.filter(key => brief[key]?.trim()).length;
+    const missing = BRIEF_FIELD_KEYS.filter(key => !brief[key]?.trim());
 
-  // Define the order and labels for display in the card
-  const displayOrder: { key: keyof CreativeBrief; label: string }[] = [
-    { key: 'overview', label: 'Campaign Objective' },
-    { key: 'objectives', label: 'Objectives' },
-    { key: 'target_audience', label: 'Target Audience' },
-    { key: 'key_message', label: 'Key Message' },
-    { key: 'tone_and_style', label: 'Tone & Style' },
-    { key: 'visual_guidelines', label: 'Visual Guidelines' },
-    { key: 'deliverable', label: 'Deliverables' },
-    { key: 'timelines', label: 'Timelines' },
-    { key: 'cta', label: 'Call to Action' },
-  ];
-
-  // Filter to only populated fields
-  const populatedDisplayFields = displayOrder.filter(({ key }) => brief[key]?.trim());
+    return {
+      populatedFields: populated,
+      missingFields: missing,
+      populatedDisplayFields: BRIEF_DISPLAY_ORDER.filter(({ key }) => brief[key]?.trim()),
+    };
+  }, [brief]);
 
   return (
     <div className="message assistant" style={{ 
@@ -116,7 +93,7 @@ export function BriefReview({
           {populatedFields < 5 ? (
             <>
               I've captured <strong>{populatedFields}</strong> of 9 key areas. Would you like to add more details? 
-              You are missing: <strong>{missingFields.map(f => fieldLabels[f]).join(', ')}</strong>.
+              You are missing: <strong>{missingFields.map(f => BRIEF_FIELD_LABELS[f]).join(', ')}</strong>.
               <br /><br />
               You can tell me things like:
               <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px' }}>
@@ -177,9 +154,10 @@ export function BriefReview({
         paddingTop: '8px',
       }}>
         <Text size={100} style={{ color: tokens.colorNeutralForeground4 }}>
-          AI-generated content may be incorrect
+          {AI_DISCLAIMER}
         </Text>
       </div>
     </div>
   );
-}
+});
+BriefReview.displayName = 'BriefReview';

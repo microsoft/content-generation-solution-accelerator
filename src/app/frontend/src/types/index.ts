@@ -47,14 +47,6 @@ export interface ChatMessage {
   violations?: ComplianceViolation[];
 }
 
-export interface Conversation {
-  id: string;
-  user_id: string;
-  messages: ChatMessage[];
-  brief?: CreativeBrief;
-  updated_at: string;
-}
-
 export interface AgentResponse {
   type: 'agent_response' | 'error' | 'status' | 'heartbeat';
   agent?: string;
@@ -70,18 +62,6 @@ export interface AgentResponse {
     conversation_id?: string;
     handoff_to?: string;
   };
-}
-
-export interface BrandGuidelines {
-  tone: string;
-  voice: string;
-  primary_color: string;
-  secondary_color: string;
-  prohibited_words: string[];
-  required_disclosures: string[];
-  max_headline_length: number;
-  max_body_length: number;
-  require_cta: boolean;
 }
 
 export interface ParsedBriefResponse {
