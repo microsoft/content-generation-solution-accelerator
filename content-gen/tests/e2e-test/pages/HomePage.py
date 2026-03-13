@@ -557,7 +557,7 @@ class HomePage(BasePage):
         Steps:
         1. Click on the quick link (USER_MESSAGE or USER_MESSAGE_2)
         2. Click the SEND_BUTTON to send the prompt
-        3. Check for loading indicator (optional - may disappear quickly if backend responds fast)
+        3. Validate ANALYZING_BRIEF_TEXT is visible
         4. Validate CONFIRM_BRIEF_BUTTON is visible
 
         Args:
@@ -587,15 +587,11 @@ class HomePage(BasePage):
             self.page.wait_for_timeout(3000)
             logger.info("✓ SEND_BUTTON clicked")
 
-            # Step 3: Check for loading indicator (optional - may disappear quickly if backend responds fast)
-            logger.info("Step 3: Checking for loading indicator...")
-            try:
-                # Look for either typing-indicator class or the status text
-                typing_indicator = self.page.locator("//div[contains(@class,'typing-indicator')]")
-                typing_indicator.wait_for(state="visible", timeout=5000)
-                logger.info("✓ Loading indicator detected")
-            except Exception:
-                logger.info("ℹ Loading indicator not visible (backend responded quickly) - proceeding to Step 4")
+            # Step 3: Validate ANALYZING_BRIEF_TEXT is visible
+            logger.info("Step 3: Waiting for ANALYZING_BRIEF_TEXT to be visible...")
+            analyzing_brief = self.page.locator(self.ANALYZING_BRIEF_TEXT)
+            expect(analyzing_brief).to_be_visible(timeout=40000)
+            logger.info("✓ ANALYZING_BRIEF_TEXT is visible")
 
             # Step 4: Validate CONFIRM_BRIEF_BUTTON is visible within 40 seconds
             logger.info("Step 4: Waiting for CONFIRM_BRIEF_BUTTON to be visible...")
