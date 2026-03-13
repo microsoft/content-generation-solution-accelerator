@@ -132,7 +132,7 @@ param enablePrivateNetworking bool = false
 param acrName string = 'contentgencontainerreg'
 
 @description('Optional. Image Tag.')
-param imageTag string = 'latest'
+param imageTag string = 'dev'
 
 @description('Optional. Enable/Disable usage telemetry.')
 param enableTelemetry bool = true
