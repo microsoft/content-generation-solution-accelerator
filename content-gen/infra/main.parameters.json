@@ -51,7 +51,7 @@
       "value": "${ACR_NAME}"
     },
     "imageTag": {
-      "value": "${IMAGE_TAG=dev}"
+      "value": "${IMAGE_TAG=latest}"
     }
   }
 }
