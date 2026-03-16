@@ -26,6 +26,26 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 This will allow the scripts to run for the current session without permanently changing your system's policy.
 
+## Deploy using GitHub Copilot Prompt
+
+You can streamline the deployment process by using GitHub Copilot in your IDE. Simply copy the prompt below and paste it into GitHub Copilot Chat. Copilot will walk you through each step of the deployment guide interactively, running commands on your behalf and helping troubleshoot any issues along the way.
+
+> [!TIP]
+> Make sure you have [GitHub Copilot](https://github.com/features/copilot) enabled in your IDE before using this prompt.
+
+```text
+Can you please follow the step-by-step guide in https://github.com/microsoft/content-generation-solution-accelerator/blob/main/content-gen/docs/DEPLOYMENT.md? Follow all the steps and check the respective deployment environment used in the current deployment. Then perform the steps in Deployment Type (Optional) and Set VM Credentials (Optional only when Production deployment is selected) step, only when end user says yes to WAF deployment else skip directly to Advanced Configuration (Optional) step. 
+
+Check if the user wants to perform changes in Advanced Configuration (Optional) step and proceed accordingly. Continue all steps post that. 
+
+Important instructions: 
+1. Do NOT make any code changes to the repository files. 
+2. Only follow the deployment guide instructions exactly as documented. 
+3. Run the commands step by step and wait for each to complete before proceeding. 
+4. If I encounter any errors or issues, help me troubleshoot and resolve them before continuing. 
+5. Explain what each step does before running it. If a step fails, suggest solutions based on the error message.
+```
+
 ## Deployment Options & Steps
 
 Pick from the options below to see step-by-step instructions for GitHub Codespaces, VS Code Dev Containers, VS Code Web, and Local Environments.
