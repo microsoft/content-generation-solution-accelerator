@@ -40,7 +40,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to Azure Container Registry
         if: ${{ (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo')) || (github.event_name == 'workflow_dispatch' && (github.ref_name == 'dependabotchanges'||github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo')) }}
@@ -74,7 +74,7 @@ jobs:
        
          fi      
       - name: Build and Push Docker Image for Frontend Server
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./content-gen/src/app
           file: ./content-gen/src/app/WebApp.Dockerfile
@@ -84,7 +84,7 @@ jobs:
             ${{ secrets.ACR_LOGIN_SERVER || 'acrlogin.azurecr.io' }}/content-gen-app:${{ steps.determine_tag.outputs.tagname }}_${{ steps.date.outputs.date }}_${{ github.run_number }}
 
       - name: Build and Push Docker Image for Backend Server
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./content-gen/src/backend
           file: ./content-gen/src/backend/ApiApp.Dockerfile
