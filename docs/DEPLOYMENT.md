@@ -30,8 +30,7 @@ This will allow the scripts to run for the current session without permanently c
 
 You can streamline the deployment process by using GitHub Copilot in your IDE. Simply copy the prompt below and paste it into GitHub Copilot Chat. Copilot will walk you through each step of the deployment guide interactively, running commands on your behalf and helping troubleshoot any issues along the way.
 
-> [!TIP]
-> Make sure you have [GitHub Copilot](https://github.com/features/copilot) enabled in your IDE before using this prompt.
+> **Prerequisites:** Ensure you have [GitHub Copilot](https://github.com/features/copilot) enabled in your environment before using this approach.
 
 ```text
 Can you please follow the step-by-step guide in https://github.com/microsoft/content-generation-solution-accelerator/blob/main/content-gen/docs/DEPLOYMENT.md? Follow all the steps and check the respective deployment environment used in the current deployment. Then perform the steps in Deployment Type (Optional) and Set VM Credentials (Optional only when Production deployment is selected) step, only when end user says yes to WAF deployment else skip directly to Advanced Configuration (Optional) step. 
@@ -45,6 +44,20 @@ Important instructions:
 4. If I encounter any errors or issues, help me troubleshoot and resolve them before continuing. 
 5. Explain what each step does before running it. If a step fails, suggest solutions based on the error message.
 ```
+During the deployment, you will be prompted with the following questions:
+
+WAF / Non-WAF:
+1. Yes - will implement WAF configuration
+2. No - will perform non-WAF deployment
+
+Customize advanced configuration parameters:
+1. Yes - will implement advanced changes to the default configurations and resources
+2. No - will keep default values
+
+App Authentication Configuration:
+1. Yes - will provide steps to implement in Azure portal
+2. No - will skip this step
+
 
 ## Deployment Options & Steps
 
