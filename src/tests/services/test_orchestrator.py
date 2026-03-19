@@ -3,7 +3,8 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import orchestrator as orch_module
+
+import orchestrator
 from orchestrator import (_HARMFUL_PATTERNS_COMPILED,
                           _SYSTEM_PROMPT_PATTERNS_COMPILED,
                           PLANNING_INSTRUCTIONS, RAI_HARMFUL_CONTENT_RESPONSE,
@@ -840,7 +841,7 @@ def test_get_orchestrator_singleton():
         mock_builder.return_value = mock_builder_instance
 
         # Reset the singleton
-        orch_module._orchestrator = None
+        orchestrator._orchestrator = None
 
         instance1 = get_orchestrator()
         instance2 = get_orchestrator()
@@ -1517,7 +1518,7 @@ async def test_get_chat_client_foundry_mode():
 def test_foundry_not_available():
     """Test when Foundry SDK is not available."""
     # Check that FOUNDRY_AVAILABLE is defined
-    assert hasattr(orch_module, 'FOUNDRY_AVAILABLE')
+    assert hasattr(orchestrator, 'FOUNDRY_AVAILABLE')
 
 # Tests for workflow event handling (lines 736-799, 841-895)
 # Note: These are integration-level tests that verify the workflow event

@@ -36,12 +36,12 @@ resource cognitiveServicesOpenAiUserRole 'Microsoft.Authorization/roleDefinition
 // ========== Existing Resources ========== //
 
 // Reference the existing AI Services account
-resource existingAiServices 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = {
+resource existingAiServices 'Microsoft.CognitiveServices/accounts@2025-10-01-preview' existing = {
   name: aiServicesName
 }
 
 // Reference the existing AI Project (if provided)
-resource existingAiProject 'Microsoft.CognitiveServices/accounts/projects@2025-04-01-preview' existing = if (!empty(aiProjectName)) {
+resource existingAiProject 'Microsoft.CognitiveServices/accounts/projects@2025-10-01-preview' existing = if (!empty(aiProjectName)) {
   name: aiProjectName
   parent: existingAiServices
 }
@@ -81,4 +81,4 @@ output aiServicesResourceId string = existingAiServices.id
 output aiServicesEndpoint string = existingAiServices.properties.endpoint
 
 @description('The principal ID of the existing AI Project (if provided).')
-output aiProjectPrincipalId string = !empty(aiProjectName) ? existingAiProject.identity.principalId : ''
+output aiProjectPrincipalId string = !empty(aiProjectName) ? existingAiProject.?identity.?principalId ?? '' : ''

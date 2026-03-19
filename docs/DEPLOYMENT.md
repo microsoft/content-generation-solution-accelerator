@@ -137,7 +137,7 @@ When you start the deployment, most parameters will have **default values**, but
 | **GPT Model Version**                       | The version of the selected GPT model.                                                                    | 2025-11-13            |
 | **OpenAI API Version**                      | The Azure OpenAI API version to use.                                                                      | 2025-01-01-preview     |
 | **GPT Model Deployment Capacity**           | Configure capacity for **GPT models** (in thousands).                                                     | 150k                    |
-| **Image Model**                            | Choose from **gpt-image-1-mini, gpt-image-1.5**                                                                          | gpt-image-1-mini             |
+| **Image Model**                            | Choose from **gpt-image-1-mini, gpt-image-1.5**                                                                               | gpt-image-1-mini                  |
 | **Image Tag**                               | Docker image tag to deploy. Common values: `latest`, `dev`, `hotfix`.                                     | latest                 |
 | **Existing Log Analytics Workspace**        | To reuse an existing Log Analytics Workspace ID.                                                          | *(empty)*              |
 | **Existing Azure AI Foundry Project**       | To reuse an existing Azure AI Foundry Project ID instead of creating a new one.                           | *(empty)*              |

@@ -49,6 +49,9 @@ param storageAccountRequired bool = false
 @description('Optional. Enable monitoring and logging configuration.')
 param enableMonitoring bool = false
 
+@description('Optional. Enable/Disable usage telemetry for module.')
+param enableTelemetry bool = true
+
 @description('Optional. Azure Resource Manager ID of the Virtual network and subnet to be joined by Regional VNET Integration.')
 param virtualNetworkSubnetId string?
 
@@ -65,7 +68,7 @@ param vnetRouteAllEnabled bool = false
 param scmSiteAlsoStopped bool = false
 
 @description('Optional. The site config object.')
-param siteConfig resourceInput<'Microsoft.Web/sites@2024-04-01'>.properties.siteConfig = {
+param siteConfig resourceInput<'Microsoft.Web/sites@2025-03-01'>.properties.siteConfig = {
   alwaysOn: true
   minTlsVersion: '1.2'
   ftpsState: 'FtpsOnly'
@@ -75,7 +78,7 @@ param siteConfig resourceInput<'Microsoft.Web/sites@2024-04-01'>.properties.site
 param configs appSettingsConfigType[]?
 
 @description('Optional. The Function App configuration object.')
-param functionAppConfig resourceInput<'Microsoft.Web/sites@2024-04-01'>.properties.functionAppConfig?
+param functionAppConfig resourceInput<'Microsoft.Web/sites@2025-03-01'>.properties.functionAppConfig?
 
 import { privateEndpointSingleServiceType } from 'br/public:avm/utl/types/avm-common-types:0.5.1'
 @description('Optional. Configuration details for private endpoints.')
@@ -103,7 +106,7 @@ param clientCertExclusionPaths string?
 param clientCertMode string = 'Optional'
 
 @description('Optional. If specified during app creation, the app is cloned from a source app.')
-param cloningInfo resourceInput<'Microsoft.Web/sites@2024-04-01'>.properties.cloningInfo?
+param cloningInfo resourceInput<'Microsoft.Web/sites@2025-03-01'>.properties.cloningInfo?
 
 @description('Optional. Size of the function container.')
 param containerSize int?
@@ -115,7 +118,7 @@ param dailyMemoryTimeQuota int?
 param enabled bool = true
 
 @description('Optional. Hostname SSL states are used to manage the SSL bindings for app\'s hostnames.')
-param hostNameSslStates resourceInput<'Microsoft.Web/sites@2024-04-01'>.properties.hostNameSslStates?
+param hostNameSslStates resourceInput<'Microsoft.Web/sites@2025-03-01'>.properties.hostNameSslStates?
 
 @description('Optional. Hyper-V sandbox.')
 param hyperV bool = false
@@ -141,7 +144,7 @@ param publicNetworkAccess string?
 param e2eEncryptionEnabled bool?
 
 @description('Optional. Property to configure various DNS related settings for a site.')
-param dnsConfiguration resourceInput<'Microsoft.Web/sites@2024-04-01'>.properties.dnsConfiguration?
+param dnsConfiguration resourceInput<'Microsoft.Web/sites@2025-03-01'>.properties.dnsConfiguration?
 
 @description('Optional. Specifies the scope of uniqueness for the default hostname during resource creation.')
 @allowed([
@@ -167,7 +170,14 @@ var identity = !empty(managedIdentities)
     }
   : null
 
-resource app 'Microsoft.Web/sites@2024-04-01' = {
+// Merge vnet properties into siteConfig (these properties moved from top-level to siteConfig in newer API versions)
+var mergedSiteConfig = union(siteConfig, {
+  vnetRouteAllEnabled: vnetRouteAllEnabled
+  vnetImagePullEnabled: vnetImagePullEnabled
+  vnetContentShareEnabled: vnetContentShareEnabled
+})
+
+resource app 'Microsoft.Web/sites@2025-03-01' = {
   name: name
   location: location
   kind: kind
@@ -186,7 +196,7 @@ resource app 'Microsoft.Web/sites@2024-04-01' = {
     storageAccountRequired: storageAccountRequired
     keyVaultReferenceIdentity: keyVaultAccessIdentityResourceId
     virtualNetworkSubnetId: virtualNetworkSubnetId
-    siteConfig: siteConfig
+    siteConfig: mergedSiteConfig
     functionAppConfig: functionAppConfig
     clientCertEnabled: clientCertEnabled
     clientCertExclusionPaths: clientCertExclusionPaths
@@ -201,9 +211,6 @@ resource app 'Microsoft.Web/sites@2024-04-01' = {
     publicNetworkAccess: !empty(publicNetworkAccess)
       ? any(publicNetworkAccess)
       : (!empty(privateEndpoints) ? 'Disabled' : 'Enabled')
-    vnetContentShareEnabled: vnetContentShareEnabled
-    vnetImagePullEnabled: vnetImagePullEnabled
-    vnetRouteAllEnabled: vnetRouteAllEnabled
     scmSiteAlsoStopped: scmSiteAlsoStopped
     endToEndEncryptionEnabled: e2eEncryptionEnabled
     dnsConfiguration: dnsConfiguration
@@ -259,7 +266,7 @@ resource app_diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-0
   }
 ]
 
-module app_privateEndpoints 'br/public:avm/res/network/private-endpoint:0.11.0' = [
+module app_privateEndpoints 'br/public:avm/res/network/private-endpoint:0.11.1' = [
   for (privateEndpoint, index) in (privateEndpoints ?? []): {
     name: '${uniqueString(deployment().name, location)}-app-PrivateEndpoint-${index}'
     scope: resourceGroup(
@@ -296,7 +303,7 @@ module app_privateEndpoints 'br/public:avm/res/network/private-endpoint:0.11.0' 
           ]
         : null
       subnetResourceId: privateEndpoint.subnetResourceId
-      enableTelemetry: false
+      enableTelemetry: enableTelemetry
       location: privateEndpoint.?location ?? reference(
         split(privateEndpoint.subnetResourceId, '/subnets/')[0],
         '2020-06-01',

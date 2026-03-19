@@ -36,11 +36,13 @@ Options:
 import argparse
 import asyncio
 import base64
+import json
 import os
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 try:
     import httpx
@@ -103,6 +105,110 @@ def print_warning(text: str):
     print(f"{Colors.YELLOW}⚠ {text}{Colors.END}")
 
 
+def get_values_from_az_deployment(resource_group: str) -> Optional[Dict[str, str]]:
+    """Get deployment output values from Azure using az CLI."""
+    print_step("Getting values from Azure deployment outputs...")
+    
+    try:
+        # First, try to get deployment name from resource group tags
+        result = subprocess.run(
+            ["az", "group", "show", "--name", resource_group, "--query", "tags.DeploymentName", "-o", "tsv"],
+            capture_output=True,
+            text=True,
+            check=True,
+            shell=(os.name == "nt")  # Required on Windows to find az.cmd
+        )
+        deployment_name = result.stdout.strip()
+        
+        # If no tag found, try to find the most recent successful deployment
+        if not deployment_name or deployment_name == "None":
+            print_warning("No DeploymentName tag found on resource group")
+            print_step("Searching for most recent successful deployment...")
+            
+            result = subprocess.run(
+                ["az", "deployment", "group", "list",
+                 "--resource-group", resource_group,
+                 "--query", "[?properties.provisioningState=='Succeeded'] | sort_by(@, &properties.timestamp) | [-1].name",
+                 "-o", "tsv"],
+                capture_output=True,
+                text=True,
+                check=True,
+                shell=(os.name == "nt")  # Required on Windows to find az.cmd
+            )
+            deployment_name = result.stdout.strip()
+            
+            if not deployment_name or deployment_name == "None":
+                print_warning("No successful deployments found in resource group")
+                return None
+            
+            print(f"  Found deployment: {deployment_name}")
+        else:
+            print(f"  Deployment Name (from tag): {deployment_name}")
+        
+        # Get deployment outputs
+        print_step("Fetching deployment outputs...")
+        result = subprocess.run(
+            ["az", "deployment", "group", "show",
+             "--name", deployment_name,
+             "--resource-group", resource_group,
+             "--query", "properties.outputs",
+             "-o", "json"],
+            capture_output=True,
+            text=True,
+            check=True,
+            shell=(os.name == "nt")  # Required on Windows to find az.cmd
+        )
+        
+        outputs = json.loads(result.stdout)
+        
+        # Build a case-insensitive lookup map for output keys.
+        # ARM/Bicep preserve output names as authored in the template; this map lets
+        # us perform lookups without worrying about casing in our code.
+        outputs_lower = {k.lower(): v for k, v in outputs.items()}
+        
+        # Extract values from deployment outputs
+        # The outputs are in format: {"keyName": {"type": "String", "value": "actual-value"}}
+        def extract_value(key: str, fallback_key: str = "") -> str:
+            """Extract value from deployment outputs, trying fallback key if primary not found."""
+            key_lower = key.lower()
+            if key_lower in outputs_lower and "value" in outputs_lower[key_lower]:
+                return outputs_lower[key_lower]["value"]
+            if fallback_key:
+                fb_lower = fallback_key.lower()
+                if fb_lower in outputs_lower and "value" in outputs_lower[fb_lower]:
+                    return outputs_lower[fb_lower]["value"]
+            return ""
+        
+        values = {
+            "app_service": extract_value("appServiceName", "APP_SERVICE_NAME"),
+            "storage_account": extract_value("azureBlobAccountName", "AZURE_BLOB_ACCOUNT_NAME"),
+            "cosmos_account": extract_value("cosmosDbAccountName", "COSMOSDB_ACCOUNT_NAME"),
+            "search_service": extract_value("aiSearchServiceName", "AI_SEARCH_SERVICE_NAME"),
+        }
+        
+        # Filter out empty values
+        values = {k: v for k, v in values.items() if v}
+        
+        if values:
+            print_success(f"Retrieved {len(values)} values from deployment outputs")
+            for k, v in values.items():
+                print(f"  {k}: {v}")
+        else:
+            print_warning("No matching values found in deployment outputs")
+        
+        return values
+        
+    except subprocess.CalledProcessError as e:
+        print_warning(f"Failed to query Azure deployment: {e.stderr if e.stderr else str(e)}")
+        return None
+    except json.JSONDecodeError as e:
+        print_warning(f"Failed to parse deployment outputs: {e}")
+        return None
+    except Exception as e:
+        print_warning(f"Error getting deployment values: {e}")
+        return None
+
+
 def discover_resources(resource_group: str, app_name: str, storage_account: str, cosmos_account: str, search_service: str, api_key: str = "") -> ResourceConfig:
     """Build resource configuration from provided values (no Azure CLI required)."""
     print_step("Configuring Azure resources...")
@@ -144,7 +250,10 @@ async def check_admin_api_health(config: ResourceConfig) -> bool:
     
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            response = await client.get(f"{config.app_url}/api/admin/health")
+            response = await client.get(
+                f"{config.app_url}/api/admin/health",
+                headers=get_api_headers(config)
+            )
             if response.status_code == 200:
                 print_success("Admin API is healthy")
                 return True
@@ -500,7 +609,7 @@ async def main():
     
     args = parser.parse_args()
     
-    # Get values from args or environment variables (args take precedence)
+    # Priority 1: Command line arguments
     resource_group = args.resource_group or os.environ.get("RESOURCE_GROUP_NAME", "")
     app_name = args.app_name or os.environ.get("APP_SERVICE_NAME", "")
     storage_account = args.storage_account or os.environ.get("AZURE_BLOB_ACCOUNT_NAME", "")
@@ -508,9 +617,39 @@ async def main():
     search_service = args.search_service or os.environ.get("AI_SEARCH_SERVICE_NAME", "")
     api_key = args.api_key or os.environ.get("ADMIN_API_KEY", "")
     
+    # Priority 2: If resource group is provided but other values are missing, try deployment outputs
+    if resource_group and (not app_name or not storage_account or not cosmos_account or not search_service):
+        print()
+        deployment_values = get_values_from_az_deployment(resource_group)
+        if deployment_values:
+            # Use deployment values only for missing parameters
+            app_name = app_name or deployment_values.get("app_service", "")
+            storage_account = storage_account or deployment_values.get("storage_account", "")
+            cosmos_account = cosmos_account or deployment_values.get("cosmos_account", "")
+            search_service = search_service or deployment_values.get("search_service", "")
+        else:
+            print_warning("Could not retrieve values from deployment outputs")
+    
     # Validate required values are present
-    if not resource_group or not app_name or not storage_account or not cosmos_account or not search_service:
-        print_error("Missing required resource names. Provide via arguments or set environment variables: RESOURCE_GROUP_NAME (--resource-group), APP_SERVICE_NAME (--app-name), AZURE_BLOB_ACCOUNT_NAME (--storage-account), COSMOSDB_ACCOUNT_NAME (--cosmos-account), AI_SEARCH_SERVICE_NAME (--search-service)")
+    if not resource_group:
+        print_error("Resource group is required. Provide via --resource-group argument or RESOURCE_GROUP_NAME environment variable.")
+        sys.exit(1)
+    
+    if not app_name or not storage_account or not cosmos_account or not search_service:
+        print_error("Missing required resource names. Please provide via:")
+        print("  1. Command line arguments (--app-name, --storage-account, --cosmos-account, --search-service)")
+        print("  2. Environment variables (APP_SERVICE_NAME, AZURE_BLOB_ACCOUNT_NAME, COSMOSDB_ACCOUNT_NAME, AI_SEARCH_SERVICE_NAME)")
+        print("  3. Azure deployment outputs (automatic if resource group has DeploymentName tag)")
+        print()
+        print("Missing values:")
+        if not app_name:
+            print("  - App Service name")
+        if not storage_account:
+            print("  - Storage Account name")
+        if not cosmos_account:
+            print("  - Cosmos DB Account name")
+        if not search_service:
+            print("  - AI Search Service name")
         sys.exit(1)
     
     print_header("Content Generation Solution Accelerator - Post Deployment")
