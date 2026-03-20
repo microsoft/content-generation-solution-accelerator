@@ -55,6 +55,15 @@
     },
     "enableScalability": {
       "value": true
+    },
+    "vmAdminUsername": {
+      "value": "${AZURE_ENV_VM_ADMIN_USERNAME}"
+    },
+    "vmAdminPassword": {
+      "value": "${AZURE_ENV_VM_ADMIN_PASSWORD}"
+    },
+    "vmSize": {
+      "value": "${AZURE_ENV_VM_SIZE}"
     }
   }
 }
