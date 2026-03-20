@@ -6,10 +6,11 @@ Includes brand guidelines as solution parameters for content strategy
 and compliance validation.
 """
 
+import logging
 import os
-from typing import List, Optional
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Self
 
@@ -23,6 +24,32 @@ def parse_comma_separated(value: str) -> List[str]:
     if isinstance(value, str) and len(value) > 0:
         return [item.strip() for item in value.split(",") if item.strip()]
     return []
+
+
+class _LoggingSettings(BaseSettings):
+    """Logging configuration settings."""
+    model_config = SettingsConfigDict(
+        env_prefix="AZURE_", env_file=DOTENV_PATH, extra="ignore", env_ignore_empty=True
+    )
+
+    basic_logging_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    package_logging_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "WARNING"
+    logging_packages: Optional[List[str]] = []
+
+    @field_validator("logging_packages", mode="before")
+    @classmethod
+    def split_logging_packages(cls, packages) -> Optional[List[str]]:
+        if isinstance(packages, str) and len(packages.strip()) > 0:
+            return [pkg.strip() for pkg in packages.split(",") if pkg.strip()]
+        return None
+
+    def get_basic_log_level(self) -> int:
+        """Convert string log level to logging constant."""
+        return getattr(logging, self.basic_logging_level.upper())
+
+    def get_package_log_level(self) -> int:
+        """Convert string package log level to logging constant."""
+        return getattr(logging, self.package_logging_level.upper())
 
 
 class _UiSettings(BaseSettings):
@@ -436,6 +463,7 @@ class _AppSettings(BaseModel):
     azure_openai: _AzureOpenAISettings = _AzureOpenAISettings()
     ai_foundry: _AIFoundrySettings = _AIFoundrySettings()
     brand_guidelines: _BrandGuidelinesSettings = _BrandGuidelinesSettings()
+    logging: _LoggingSettings = _LoggingSettings()
     ui: Optional[_UiSettings] = _UiSettings()
 
     # Constructed properties

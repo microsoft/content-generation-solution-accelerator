@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "7762801937040004596"
+      "templateHash": "14392918201193616164"
     },
     "name": "Intelligent Content Generation Accelerator",
     "description": "Solution Accelerator for multimodal marketing content generation using Microsoft Agent Framework.\n"
@@ -3570,14 +3570,7 @@
           "flowType": {
             "value": "Bluefield"
           },
-          "workspaceResourceId": "[if(variables('useExistingLogAnalytics'), createObject('value', parameters('existingLogAnalyticsWorkspaceId')), if(parameters('enableMonitoring'), createObject('value', reference('logAnalyticsWorkspace').outputs.resourceId.value), createObject('value', '')))]",
-          "diagnosticSettings": {
-            "value": [
-              {
-                "workspaceResourceId": "[if(variables('useExistingLogAnalytics'), parameters('existingLogAnalyticsWorkspaceId'), if(parameters('enableMonitoring'), reference('logAnalyticsWorkspace').outputs.resourceId.value, ''))]"
-              }
-            ]
-          }
+          "workspaceResourceId": "[if(variables('useExistingLogAnalytics'), createObject('value', parameters('existingLogAnalyticsWorkspaceId')), if(parameters('enableMonitoring'), createObject('value', reference('logAnalyticsWorkspace').outputs.resourceId.value), createObject('value', '')))]"
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
@@ -33165,6 +33158,22 @@
               {
                 "name": "AZURE_AI_IMAGE_MODEL_DEPLOYMENT",
                 "value": "[variables('imageModelConfig')[parameters('imageModelChoice')].name]"
+              },
+              {
+                "name": "AZURE_BASIC_LOGGING_LEVEL",
+                "value": "INFO"
+              },
+              {
+                "name": "AZURE_PACKAGE_LOGGING_LEVEL",
+                "value": "WARNING"
+              },
+              {
+                "name": "AZURE_LOGGING_PACKAGES",
+                "value": ""
+              },
+              {
+                "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+                "value": "[if(parameters('enableMonitoring'), reference('applicationInsights').outputs.connectionString.value, '')]"
               }
             ]
           }
@@ -33356,6 +33365,7 @@
       },
       "dependsOn": [
         "aiFoundryAiServicesProject",
+        "applicationInsights",
         "userAssignedIdentity",
         "virtualNetwork"
       ]
