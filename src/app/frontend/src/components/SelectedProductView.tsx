@@ -1,19 +1,19 @@
+import { memo } from 'react';
 import {
-  Text,
   Badge,
   tokens,
 } from '@fluentui/react-components';
 import {
   Checkmark20Regular,
-  Box20Regular,
 } from '@fluentui/react-icons';
 import type { Product } from '../types';
+import { ProductCard } from './ProductCard';
 
 interface SelectedProductViewProps {
   products: Product[];
 }
 
-export function SelectedProductView({ products }: SelectedProductViewProps) {
+export const SelectedProductView = memo(function SelectedProductView({ products }: SelectedProductViewProps) {
   if (products.length === 0) return null;
 
   return (
@@ -50,89 +50,14 @@ export function SelectedProductView({ products }: SelectedProductViewProps) {
         overflowY: 'auto',
       }}>
         {products.map((product, index) => (
-          <div 
-            key={product.sku || index} 
-            style={{ 
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px',
-              backgroundColor: tokens.colorNeutralBackground1,
-              borderRadius: '8px',
-              border: `1px solid ${tokens.colorNeutralStroke2}`,
-            }}
-          >
-            {product.image_url ? (
-              <img
-                src={product.image_url}
-                alt={product.product_name}
-                style={{
-                  width: '56px',
-                  height: '56px',
-                  objectFit: 'cover',
-                  borderRadius: '6px',
-                  border: `1px solid ${tokens.colorNeutralStroke2}`,
-                  flexShrink: 0,
-                }}
-              />
-            ) : (
-              <div 
-                style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '6px',
-                  backgroundColor: tokens.colorNeutralBackground3,
-                  border: `1px solid ${tokens.colorNeutralStroke2}`,
-                  flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Box20Regular style={{ color: tokens.colorNeutralForeground3 }} />
-              </div>
-            )}
-            
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <Text 
-                weight="semibold" 
-                size={300}
-                style={{
-                  display: 'block',
-                  color: tokens.colorNeutralForeground1,
-                  marginBottom: '2px',
-                }}
-              >
-                {product.product_name}
-              </Text>
-              <Text 
-                size={200}
-                style={{ 
-                  display: 'block',
-                  color: tokens.colorNeutralForeground3,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {product.tags || product.description || 'soft white, airy, minimal, fresh'}
-              </Text>
-              <Text 
-                weight="semibold" 
-                size={200}
-                style={{ 
-                  display: 'block',
-                  color: tokens.colorNeutralForeground1,
-                  marginTop: '2px',
-                }}
-              >
-                ${product.price?.toFixed(2) || '59.95'} USD
-              </Text>
-            </div>
-          </div>
+          <ProductCard
+            key={product.sku || index}
+            product={product}
+            size="compact"
+          />
         ))}
       </div>
     </div>
   );
-}
+});
+SelectedProductView.displayName = 'SelectedProductView';
