@@ -175,6 +175,36 @@ class _AIFoundrySettings(BaseSettings):
     model_deployment: Optional[str] = Field(default=None, alias="AZURE_AI_MODEL_DEPLOYMENT_NAME")
     image_deployment: str = Field(default="gpt-image-1-mini", alias="AZURE_AI_IMAGE_MODEL_DEPLOYMENT")
 
+    # Agent naming — agents are pre-created by infra/scripts/agent_scripts/01_create_agents.py
+    # Names follow the pattern CG-{Type}Agent-{solution_name}
+    solution_name: str = Field(default="default", alias="AZURE_AI_SOLUTION_NAME")
+
+    # Individual agent names (set by agent creation script / ACI env vars).
+    # When set, these override the derived names from solution_name.
+    triage_agent_name: Optional[str] = Field(default=None, alias="AGENT_NAME_TRIAGE")
+    planning_agent_name: Optional[str] = Field(default=None, alias="AGENT_NAME_PLANNING")
+    research_agent_name: Optional[str] = Field(default=None, alias="AGENT_NAME_RESEARCH")
+    text_content_agent_name: Optional[str] = Field(default=None, alias="AGENT_NAME_TEXT_CONTENT")
+    image_content_agent_name: Optional[str] = Field(default=None, alias="AGENT_NAME_IMAGE_CONTENT")
+    compliance_agent_name: Optional[str] = Field(default=None, alias="AGENT_NAME_COMPLIANCE")
+    rai_agent_name: Optional[str] = Field(default=None, alias="AGENT_NAME_RAI")
+    title_agent_name: Optional[str] = Field(default=None, alias="AGENT_NAME_TITLE")
+
+    @property
+    def agent_names(self) -> dict:
+        """Return agent names — prefer explicit env vars, fall back to derived names."""
+        s = self.solution_name
+        return {
+            "triage": self.triage_agent_name or f"CG-TriageAgent-{s}",
+            "planning": self.planning_agent_name or f"CG-PlanningAgent-{s}",
+            "research": self.research_agent_name or f"CG-ResearchAgent-{s}",
+            "text_content": self.text_content_agent_name or f"CG-TextContentAgent-{s}",
+            "image_content": self.image_content_agent_name or f"CG-ImageContentAgent-{s}",
+            "compliance": self.compliance_agent_name or f"CG-ComplianceAgent-{s}",
+            "rai": self.rai_agent_name or f"CG-RAIAgent-{s}",
+            "title": self.title_agent_name or f"CG-TitleAgent-{s}",
+        }
+
 
 class _SearchSettings(BaseSettings):
     """Azure AI Search configuration."""

@@ -9,7 +9,7 @@ from orchestrator import (_HARMFUL_PATTERNS_COMPILED,
                           _SYSTEM_PROMPT_PATTERNS_COMPILED,
                           PLANNING_INSTRUCTIONS, RAI_HARMFUL_CONTENT_RESPONSE,
                           RAI_INSTRUCTIONS, RESEARCH_INSTRUCTIONS,
-                          TOKEN_ENDPOINT, TRIAGE_INSTRUCTIONS,
+                          TRIAGE_INSTRUCTIONS,
                           ContentGenerationOrchestrator,
                           _check_input_for_harmful_content,
                           _filter_system_prompt_from_response,
@@ -211,12 +211,6 @@ def test_system_prompt_patterns_compiled():
         assert hasattr(pattern, 'search')
 
 
-def test_token_endpoint_defined():
-    """Test that token endpoint is correctly defined."""
-
-    assert TOKEN_ENDPOINT == "https://cognitiveservices.azure.com/.default"
-
-
 @pytest.mark.asyncio
 async def test_orchestrator_creation():
     """Test creating a ContentGenerationOrchestrator instance."""
@@ -238,7 +232,7 @@ async def test_orchestrator_initialize_creates_workflow():
     """Test that initialize creates the workflow."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -254,63 +248,77 @@ async def test_orchestrator_initialize_creates_workflow():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
 
         assert orchestrator._initialized is True
         mock_builder.assert_called_once()
 
 
+MOCK_FOUNDRY_AGENT_NAMES = {
+    "triage": "triage-agent",
+    "planning": "planning-agent",
+    "research": "research-agent",
+    "text_content": "text-content-agent",
+    "image_content": "image-content-agent",
+    "compliance": "compliance-agent",
+    "rai": "rai-agent",
+    "title": "title-agent",
+}
+
+
 @pytest.mark.asyncio
 async def test_orchestrator_initialize_foundry_mode():
-    """Test orchestrator in foundry mode."""
+    """Test orchestrator in foundry mode uses AzureAIProjectAgentProvider.get_agent."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
-         patch("orchestrator.HandoffBuilder") as mock_builder, \
-         patch("orchestrator.FOUNDRY_AVAILABLE", True), \
-         patch("orchestrator.AIProjectClient"):
+         patch("orchestrator.AsyncDefaultAzureCredential") as mock_async_cred, \
+         patch("orchestrator.AzureAIProjectAgentProvider") as mock_provider_cls, \
+         patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = True
-        mock_settings.ai_foundry.project_endpoint = "https://foundry.azure.com"
-        mock_settings.ai_foundry.model_deployment = "gpt-4"
-        mock_settings.azure_openai.endpoint = "https://test.openai.azure.com"
-        mock_settings.azure_openai.api_version = "2024-02-15"
-        mock_settings.azure_openai.gpt_model = "gpt-4"
-        mock_settings.azure_openai.gpt_model_mini = "gpt-4-mini"
-        mock_settings.azure_openai.dalle_model = "dall-e-3"
-        mock_settings.base_settings.azure_client_id = None
+        mock_settings.ai_foundry.project_endpoint = "https://test.project.azure.com"
+        mock_settings.ai_foundry.agent_names = MOCK_FOUNDRY_AGENT_NAMES
 
-        mock_credential = MagicMock()
-        mock_credential.get_token.return_value = MagicMock(token="test-token")
-        mock_cred.return_value = mock_credential
+        mock_async_credential = MagicMock()
+        mock_async_cred.return_value = mock_async_credential
 
-        mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
-        mock_client.return_value = mock_chat_client
+        mock_provider = MagicMock()
+        mock_provider.get_agent = AsyncMock(return_value=MagicMock())
+        mock_provider_cls.return_value = mock_provider
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
 
         assert orchestrator._initialized is True
         assert orchestrator._use_foundry is True
+        # Foundry mode should use AzureAIProjectAgentProvider with get_agent
+        mock_provider_cls.assert_called_once_with(
+            project_endpoint="https://test.project.azure.com",
+            credential=mock_async_credential,
+        )
+        assert mock_provider.get_agent.call_count == 7  # 7 agents retrieved
 
 
 @pytest.mark.asyncio
@@ -339,7 +347,7 @@ async def test_process_message_safe_content():
     """Test that process_message allows safe content."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -355,39 +363,38 @@ async def test_process_message_safe_content():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
-        # Create async generator for workflow.run_stream
-        # WorkflowOutputEvent.data should be a list of ChatMessage objects
+        # Create async generator for workflow.run(stream=True)
+        # WorkflowEvent output data should be a list of Message objects
         async def mock_stream(*_args, **_kwargs):
-            from agent_framework import WorkflowOutputEvent
+            from agent_framework import WorkflowEvent
 
-            # Create a mock ChatMessage with expected attributes
+            # Create a mock Message with expected attributes
             mock_message = MagicMock()
-            mock_message.role.value = "assistant"
+            mock_message.role = "assistant"
             mock_message.text = "Here's your marketing content"
             mock_message.author_name = "content_agent"
 
-            # Use real WorkflowOutputEvent so isinstance() check passes
-            event = WorkflowOutputEvent(data=[mock_message], source_executor_id="test")
+            # Use real WorkflowEvent with type="output"
+            event = WorkflowEvent(type="output", data=[mock_message], source_executor_id="test")
             yield event
 
         mock_workflow = MagicMock()
-        mock_workflow.run_stream = mock_stream
+        mock_workflow.run = mock_stream
 
         mock_builder_instance = MagicMock()
         # Mock all chained builder methods to return the builder instance
         mock_builder_instance.participants.return_value = mock_builder_instance
         mock_builder_instance.with_start_agent.return_value = mock_builder_instance
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
         mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
 
         # The workflow runs successfully with safe content (no RAI block)
         first_event = None
@@ -424,7 +431,7 @@ async def test_parse_brief_complete():
     """Test parse_brief with complete brief data."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -440,7 +447,7 @@ async def test_parse_brief_complete():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         # Mock planning agent response
@@ -466,13 +473,15 @@ async def test_parse_brief_complete():
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
         orchestrator._agents["planning"] = mock_planning_agent
         orchestrator._rai_agent = mock_rai_agent
 
@@ -513,7 +522,7 @@ async def test_select_products_add_action():
     """Test select_products with add action."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -529,7 +538,7 @@ async def test_select_products_add_action():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_research_agent = AsyncMock()
@@ -541,13 +550,15 @@ async def test_select_products_add_action():
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
         orchestrator._agents["research"] = mock_research_agent
 
         result = await orchestrator.select_products(
@@ -564,7 +575,7 @@ async def test_select_products_json_error():
     """Test select_products handles JSON parsing errors."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -580,7 +591,7 @@ async def test_select_products_json_error():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_research_agent = AsyncMock()
@@ -588,13 +599,15 @@ async def test_select_products_json_error():
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
         orchestrator._agents["research"] = mock_research_agent
 
         result = await orchestrator.select_products(
@@ -611,7 +624,7 @@ async def test_generate_content_text_only():
     """Test generate_content without images."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder, \
          patch("orchestrator._check_input_for_harmful_content") as mock_check:
 
@@ -630,7 +643,7 @@ async def test_generate_content_text_only():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_text_agent = AsyncMock()
@@ -641,15 +654,17 @@ async def test_generate_content_text_only():
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         from models import CreativeBrief
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
         orchestrator._agents["text_content"] = mock_text_agent
         orchestrator._agents["compliance"] = mock_compliance_agent
 
@@ -669,7 +684,7 @@ async def test_generate_content_with_compliance_violations():
     """Test generate_content with compliance violations."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder, \
          patch("orchestrator._check_input_for_harmful_content") as mock_check:
 
@@ -688,7 +703,7 @@ async def test_generate_content_with_compliance_violations():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_text_agent = AsyncMock()
@@ -703,15 +718,17 @@ async def test_generate_content_with_compliance_violations():
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         from models import CreativeBrief
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
         orchestrator._agents["text_content"] = mock_text_agent
         orchestrator._agents["compliance"] = mock_compliance_agent
 
@@ -814,7 +831,7 @@ def test_get_orchestrator_singleton():
     """Test that get_orchestrator returns singleton instance."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -830,13 +847,15 @@ def test_get_orchestrator_singleton():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
@@ -863,92 +882,6 @@ async def test_get_chat_client_missing_endpoint():
 
         with pytest.raises(ValueError, match="AZURE_OPENAI_ENDPOINT"):
             orchestrator._get_chat_client()
-
-
-@pytest.mark.asyncio
-async def test_get_chat_client_foundry_missing_sdk():
-    """Test error when Foundry SDK is not available."""
-    with patch("orchestrator.app_settings") as mock_settings, \
-         patch("orchestrator.DefaultAzureCredential"), \
-         patch("orchestrator.FOUNDRY_AVAILABLE", False):
-
-        mock_settings.ai_foundry.use_foundry = True
-        mock_settings.base_settings.azure_client_id = None
-
-        orchestrator = ContentGenerationOrchestrator()
-
-        with pytest.raises(ImportError, match="Azure AI Foundry SDK"):
-            orchestrator._get_chat_client()
-
-
-@pytest.mark.asyncio
-async def test_get_chat_client_foundry_missing_endpoint():
-    """Test error when Foundry project endpoint is missing."""
-    with patch("orchestrator.app_settings") as mock_settings, \
-         patch("orchestrator.DefaultAzureCredential"), \
-         patch("orchestrator.FOUNDRY_AVAILABLE", True), \
-         patch("orchestrator.AIProjectClient"):
-
-        mock_settings.ai_foundry.use_foundry = True
-        mock_settings.ai_foundry.project_endpoint = None
-        mock_settings.base_settings.azure_client_id = None
-
-        orchestrator = ContentGenerationOrchestrator()
-
-        with pytest.raises(ValueError, match="AZURE_AI_PROJECT_ENDPOINT"):
-            orchestrator._get_chat_client()
-
-
-@pytest.mark.asyncio
-async def test_generate_foundry_image_no_credential():
-    """Test _generate_foundry_image with no credential."""
-    with patch("orchestrator.app_settings") as mock_settings, \
-         patch("orchestrator.DefaultAzureCredential"), \
-         patch("orchestrator.HandoffBuilder"):
-
-        mock_settings.ai_foundry.use_foundry = True
-        mock_settings.azure_openai.endpoint = "https://test.openai.azure.com"
-        mock_settings.azure_openai.image_endpoint = "https://test.openai.azure.com"
-        mock_settings.ai_foundry.image_deployment = "gpt-image-1-mini"
-        mock_settings.base_settings.azure_client_id = None
-
-        orchestrator = ContentGenerationOrchestrator()
-        orchestrator._initialized = True
-        orchestrator._use_foundry = True
-        orchestrator._credential = None
-
-        results = {}
-        await orchestrator._generate_foundry_image("test prompt", results)
-
-        assert "image_error" in results
-
-
-@pytest.mark.asyncio
-async def test_generate_foundry_image_no_endpoint():
-    """Test _generate_foundry_image with no endpoint."""
-    with patch("orchestrator.app_settings") as mock_settings, \
-         patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.HandoffBuilder"):
-
-        mock_settings.ai_foundry.use_foundry = True
-        mock_settings.azure_openai.endpoint = None
-        mock_settings.azure_openai.image_endpoint = None
-        mock_settings.ai_foundry.image_deployment = "gpt-image-1-mini"
-        mock_settings.base_settings.azure_client_id = None
-
-        mock_credential = MagicMock()
-        mock_credential.get_token.return_value = MagicMock(token="test-token")
-        mock_cred.return_value = mock_credential
-
-        orchestrator = ContentGenerationOrchestrator()
-        orchestrator._initialized = True
-        orchestrator._use_foundry = True
-        orchestrator._credential = mock_credential
-
-        results = {}
-        await orchestrator._generate_foundry_image("test prompt", results)
-
-        assert "image_error" in results
 
 
 @pytest.mark.asyncio
@@ -1005,7 +938,7 @@ async def test_process_message_empty_events():
     """Test process_message with workflow returning no events."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -1021,7 +954,7 @@ async def test_process_message_empty_events():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         async def empty_stream(*_args, **_kwargs):
@@ -1029,16 +962,18 @@ async def test_process_message_empty_events():
                 yield  # Make it a generator
 
         mock_workflow = MagicMock()
-        mock_workflow.run_stream = empty_stream
+        mock_workflow.run = empty_stream
 
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
 
         responses = []
         async for response in orchestrator.process_message("test", conversation_id="conv-123"):
@@ -1053,7 +988,7 @@ async def test_parse_brief_rai_agent_blocks():
     """Test parse_brief when RAI agent returns TRUE (blocked)."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -1069,18 +1004,20 @@ async def test_parse_brief_rai_agent_blocks():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
 
         # Mock RAI agent to return TRUE (blocked)
         mock_rai_agent = MagicMock()
@@ -1098,7 +1035,7 @@ async def test_parse_brief_rai_agent_exception():
     """Test parse_brief continues when RAI agent raises exception."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -1114,18 +1051,20 @@ async def test_parse_brief_rai_agent_exception():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
 
         # Mock RAI agent to throw exception
         mock_rai_agent = MagicMock()
@@ -1148,7 +1087,7 @@ async def test_parse_brief_incomplete_fields():
     """Test parse_brief with incomplete brief returns clarifying message."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -1164,18 +1103,20 @@ async def test_parse_brief_incomplete_fields():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
 
         # Mock RAI agent to pass
         mock_rai_agent = MagicMock()
@@ -1204,7 +1145,7 @@ async def test_parse_brief_json_in_code_block():
     """Test parse_brief extracts JSON from markdown code blocks."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -1220,18 +1161,20 @@ async def test_parse_brief_json_in_code_block():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
 
         mock_rai_agent = MagicMock()
         mock_rai_agent.run = AsyncMock(return_value="FALSE")
@@ -1258,7 +1201,7 @@ async def test_generate_content_text_content():
     """Test generate_content produces text content."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -1274,20 +1217,22 @@ async def test_generate_content_text_content():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         from models import CreativeBrief
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
 
         # Mock agents
         mock_text_agent = MagicMock()
@@ -1322,42 +1267,54 @@ async def test_generate_content_text_content():
 
 @pytest.mark.asyncio
 async def test_regenerate_image_foundry_mode():
-    """Test regenerate_image in Foundry mode."""
+    """Test regenerate_image in Foundry mode uses generate_image."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
-         patch("orchestrator.HandoffBuilder") as mock_builder:
+         patch("orchestrator.AsyncDefaultAzureCredential") as mock_async_cred, \
+         patch("orchestrator.AzureAIProjectAgentProvider") as mock_provider_cls, \
+         patch("orchestrator.HandoffBuilder") as mock_builder, \
+         patch("agents.image_content_agent.generate_image") as mock_generate_image:
 
         mock_settings.ai_foundry.use_foundry = True
+        mock_settings.ai_foundry.project_endpoint = "https://test.project.azure.com"
+        mock_settings.ai_foundry.agent_names = MOCK_FOUNDRY_AGENT_NAMES
         mock_settings.ai_foundry.image_endpoint = "https://image.openai.azure.com"
         mock_settings.ai_foundry.image_deployment = "dall-e-3"
-        mock_settings.azure_openai.endpoint = "https://test.openai.azure.com"
-        mock_settings.azure_openai.api_version = "2024-02-15"
-        mock_settings.azure_openai.gpt_model = "gpt-4"
-        mock_settings.azure_openai.gpt_model_mini = "gpt-4-mini"
-        mock_settings.azure_openai.dalle_model = "dall-e-3"
-        mock_settings.azure_openai.preview_api_version = "2024-02-01"
         mock_settings.base_settings.azure_client_id = None
 
-        mock_credential = MagicMock()
-        mock_credential.get_token.return_value = MagicMock(token="test-token")
-        mock_cred.return_value = mock_credential
+        mock_async_cred.return_value = MagicMock()
 
-        mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
-        mock_client.return_value = mock_chat_client
+        mock_provider = MagicMock()
+        mock_provider.get_agent = AsyncMock(return_value=MagicMock())
+        mock_provider_cls.return_value = mock_provider
+
+        mock_image_agent = AsyncMock()
+        mock_image_agent.run.return_value = json.dumps({
+            "prompt": "Modified product image prompt",
+            "change_summary": "Made it more colorful"
+        })
+
+        mock_generate_image.return_value = {
+            "success": True,
+            "image_base64": base64.b64encode(b"regenerated_image").decode(),
+            "revised_prompt": "Enhanced modified prompt"
+        }
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         from models import CreativeBrief
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
+        orchestrator._agents["image_content"] = mock_image_agent
+        orchestrator._save_image_to_blob = AsyncMock()
 
         brief = CreativeBrief(
             overview="Test", objectives="Sell", target_audience="Adults",
@@ -1365,16 +1322,16 @@ async def test_regenerate_image_foundry_mode():
             timelines="", visual_guidelines="Modern", cta=""
         )
 
-        with patch.object(orchestrator, '_generate_foundry_image', new=AsyncMock()):
-            result = await orchestrator.regenerate_image(
-                modification_request="Make it more colorful",
-                brief=brief,
-                products=[{"product_name": "Paint", "description": "Blue"}],
-                previous_image_prompt="previous prompt"
-            )
+        result = await orchestrator.regenerate_image(
+            modification_request="Make it more colorful",
+            brief=brief,
+            products=[{"product_name": "Paint", "description": "Blue"}],
+            previous_image_prompt="previous prompt"
+        )
 
         assert "image_prompt" in result
         assert "message" in result
+        mock_generate_image.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -1382,39 +1339,41 @@ async def test_regenerate_image_exception():
     """Test regenerate_image handles exceptions gracefully."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AsyncDefaultAzureCredential") as mock_async_cred, \
+         patch("orchestrator.AzureAIProjectAgentProvider") as mock_provider_cls, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = True
+        mock_settings.ai_foundry.project_endpoint = "https://test.project.azure.com"
+        mock_settings.ai_foundry.agent_names = MOCK_FOUNDRY_AGENT_NAMES
         mock_settings.ai_foundry.image_endpoint = "https://image.openai.azure.com"
         mock_settings.ai_foundry.image_deployment = "dall-e-3"
-        mock_settings.azure_openai.endpoint = "https://test.openai.azure.com"
-        mock_settings.azure_openai.api_version = "2024-02-15"
-        mock_settings.azure_openai.gpt_model = "gpt-4"
-        mock_settings.azure_openai.gpt_model_mini = "gpt-4-mini"
-        mock_settings.azure_openai.dalle_model = "dall-e-3"
-        mock_settings.azure_openai.preview_api_version = "2024-02-01"
         mock_settings.base_settings.azure_client_id = None
 
-        mock_credential = MagicMock()
-        mock_credential.get_token.return_value = MagicMock(token="test-token")
-        mock_cred.return_value = mock_credential
+        mock_async_cred.return_value = MagicMock()
 
-        mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
-        mock_client.return_value = mock_chat_client
+        mock_provider = MagicMock()
+        mock_provider.get_agent = AsyncMock(return_value=MagicMock())
+        mock_provider_cls.return_value = mock_provider
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         from models import CreativeBrief
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
+
+        # Mock image agent to raise an exception
+        mock_image_agent = AsyncMock()
+        mock_image_agent.run = AsyncMock(side_effect=Exception("Test error"))
+        orchestrator._agents["image_content"] = mock_image_agent
 
         brief = CreativeBrief(
             overview="Test", objectives="Sell", target_audience="Adults",
@@ -1422,66 +1381,14 @@ async def test_regenerate_image_exception():
             timelines="", visual_guidelines="Modern", cta=""
         )
 
-        with patch.object(orchestrator, '_generate_foundry_image', new=AsyncMock(side_effect=Exception("Test error"))):
-            result = await orchestrator.regenerate_image(
-                modification_request="Change",
-                brief=brief,
-                products=[],
-                previous_image_prompt=None
-            )
+        result = await orchestrator.regenerate_image(
+            modification_request="Change",
+            brief=brief,
+            products=[],
+            previous_image_prompt=None
+        )
 
         assert "error" in result
-
-
-@pytest.mark.asyncio
-async def test_generate_foundry_image_credential_none_returns_error():
-    """Test _generate_foundry_image when credential is None returns error."""
-    with patch("orchestrator.app_settings") as mock_settings, \
-         patch("orchestrator.DefaultAzureCredential") as mock_cred:
-
-        mock_settings.ai_foundry.use_foundry = True
-        mock_settings.ai_foundry.image_endpoint = "https://image.openai.azure.com"
-        mock_settings.ai_foundry.image_deployment = "dall-e-3"
-        mock_settings.azure_openai.endpoint = "https://test.openai.azure.com"
-        mock_settings.azure_openai.image_model = "dall-e-3"
-        mock_settings.azure_openai.preview_api_version = "2024-02-01"
-        mock_settings.base_settings.azure_client_id = None
-
-        mock_cred.return_value = None
-
-        orchestrator = ContentGenerationOrchestrator()
-        orchestrator._credential = None
-
-        results = {}
-        await orchestrator._generate_foundry_image("Test prompt", results)
-
-        assert "image_error" in results
-
-
-@pytest.mark.asyncio
-async def test_generate_foundry_image_no_image_endpoint():
-    """Test _generate_foundry_image with no endpoint."""
-    with patch("orchestrator.app_settings") as mock_settings, \
-         patch("orchestrator.DefaultAzureCredential") as mock_cred:
-
-        mock_settings.ai_foundry.use_foundry = True
-        mock_settings.ai_foundry.image_endpoint = None
-        mock_settings.ai_foundry.image_deployment = None
-        mock_settings.azure_openai.endpoint = None
-        mock_settings.azure_openai.image_model = None
-        mock_settings.base_settings.azure_client_id = None
-
-        mock_credential = MagicMock()
-        mock_credential.get_token.return_value = MagicMock(token="test-token")
-        mock_cred.return_value = mock_credential
-
-        orchestrator = ContentGenerationOrchestrator()
-        orchestrator._credential = mock_credential
-
-        results = {}
-        await orchestrator._generate_foundry_image("Test prompt", results)
-
-        assert "image_error" in results
 
 
 @pytest.mark.asyncio
@@ -1489,8 +1396,7 @@ async def test_get_chat_client_foundry_mode():
     """Test _get_chat_client in Foundry mode."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
-         patch("orchestrator.FOUNDRY_AVAILABLE", True):
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client:
 
         mock_settings.ai_foundry.use_foundry = True
         mock_settings.ai_foundry.model_deployment = "gpt-4-foundry"
@@ -1513,12 +1419,10 @@ async def test_get_chat_client_foundry_mode():
 
         assert client == mock_chat_instance
         mock_client.assert_called_once()
+        # Verify Foundry model deployment is used
+        call_kwargs = mock_client.call_args[1]
+        assert call_kwargs["deployment_name"] == "gpt-4-foundry"
 
-
-def test_foundry_not_available():
-    """Test when Foundry SDK is not available."""
-    # Check that FOUNDRY_AVAILABLE is defined
-    assert hasattr(orchestrator, 'FOUNDRY_AVAILABLE')
 
 # Tests for workflow event handling (lines 736-799, 841-895)
 # Note: These are integration-level tests that verify the workflow event
@@ -1531,7 +1435,7 @@ async def test_process_message_with_context():
     """Test process_message with context parameter."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client:
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client:
 
         mock_settings.ai_foundry.use_foundry = False
         mock_settings.azure_openai.endpoint = "https://test.openai.azure.com"
@@ -1546,20 +1450,20 @@ async def test_process_message_with_context():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         # Track if workflow was called
         call_tracker = {"called": False, "input": None}
 
-        async def mock_stream(input_text):
+        async def mock_stream(input_text=None, **kwargs):
             call_tracker["called"] = True
             call_tracker["input"] = input_text
             if False:
                 yield  # Make it an async generator
 
         mock_workflow = MagicMock()
-        mock_workflow.run_stream = mock_stream
+        mock_workflow.run = mock_stream
 
         orchestrator = ContentGenerationOrchestrator()
         orchestrator._initialized = True  # Mark as initialized
@@ -1586,7 +1490,7 @@ async def test_send_user_response_safe_content():
     """Test send_user_response allows safe content through."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client:
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client:
 
         mock_settings.ai_foundry.use_foundry = False
         mock_settings.azure_openai.endpoint = "https://test.openai.azure.com"
@@ -1601,19 +1505,19 @@ async def test_send_user_response_safe_content():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         call_tracker = {"called": False, "responses": None}
 
-        async def mock_send(responses):
+        async def mock_send(**kwargs):
             call_tracker["called"] = True
-            call_tracker["responses"] = responses
+            call_tracker["responses"] = kwargs.get("responses")
             if False:
                 yield  # async generator
 
         mock_workflow = MagicMock()
-        mock_workflow.send_responses_streaming = mock_send
+        mock_workflow.run = mock_send
 
         orchestrator = ContentGenerationOrchestrator()
         orchestrator._initialized = True  # Mark as initialized
@@ -1637,7 +1541,7 @@ async def test_parse_brief_json_with_backticks():
     """Test parse_brief extracting JSON from ```json blocks."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -1653,7 +1557,7 @@ async def test_parse_brief_json_with_backticks():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         # Mock planning agent to return JSON in ```json block
@@ -1683,13 +1587,15 @@ async def test_parse_brief_json_with_backticks():
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
         orchestrator._agents["planning"] = mock_planning_agent
         orchestrator._rai_agent = mock_rai_agent
 
@@ -1705,7 +1611,7 @@ async def test_parse_brief_with_dict_field_value():
     """Test parse_brief handles dict values in extracted_fields."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -1721,7 +1627,7 @@ async def test_parse_brief_with_dict_field_value():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         # Mock planning agent with dict field values (line 1031)
@@ -1749,13 +1655,15 @@ async def test_parse_brief_with_dict_field_value():
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
         orchestrator._agents["planning"] = mock_planning_agent
         orchestrator._rai_agent = mock_rai_agent
 
@@ -1777,7 +1685,7 @@ async def test_parse_brief_fallback_extraction():
     """Test parse_brief falls back to _extract_brief_from_text on parse error."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder:
 
         mock_settings.ai_foundry.use_foundry = False
@@ -1793,7 +1701,7 @@ async def test_parse_brief_fallback_extraction():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         # Mock planning agent with invalid JSON
@@ -1805,13 +1713,15 @@ async def test_parse_brief_fallback_extraction():
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
         orchestrator._agents["planning"] = mock_planning_agent
         orchestrator._rai_agent = mock_rai_agent
 
@@ -1825,282 +1735,59 @@ async def test_parse_brief_fallback_extraction():
 
 
 @pytest.mark.asyncio
-async def test_generate_foundry_image_success():
-    """Test successful Foundry image generation via HTTP."""
-    with patch("orchestrator.app_settings") as mock_settings, \
-         patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("httpx.AsyncClient") as mock_httpx:
-
-        mock_settings.ai_foundry.use_foundry = True
-        mock_settings.ai_foundry.image_deployment = "gpt-image-1-mini"
-        mock_settings.azure_openai.endpoint = "https://test.openai.azure.com"
-        mock_settings.azure_openai.image_model = "gpt-image-1-mini"
-        mock_settings.azure_openai.image_api_version = "2025-04-01-preview"
-        mock_settings.azure_openai.image_size = "1024x1024"
-        mock_settings.azure_openai.image_quality = "medium"
-        mock_settings.azure_openai.preview_api_version = "2024-02-01"
-        mock_settings.base_settings.azure_client_id = None
-
-        mock_credential = MagicMock()
-        mock_credential.get_token.return_value = MagicMock(token="test-token")
-        mock_cred.return_value = mock_credential
-
-        # Mock successful HTTP response
-        test_image_data = base64.b64encode(b"fake_image_bytes").decode()
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": [{"b64_json": test_image_data, "revised_prompt": "A beautiful image"}]
-        }
-
-        mock_client_instance = MagicMock()
-        mock_client_instance.post = AsyncMock(return_value=mock_response)
-        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-        mock_httpx.return_value = mock_client_instance
-
-        orchestrator = ContentGenerationOrchestrator()
-        orchestrator._credential = mock_credential
-
-        # Mock _save_image_to_blob
-        orchestrator._save_image_to_blob = AsyncMock()
-
-        results = {}
-        await orchestrator._generate_foundry_image("Create a product image", results)
-
-        # Should have called save_image_to_blob
-        orchestrator._save_image_to_blob.assert_called_once()
-        assert "image_revised_prompt" in results or "image_error" not in results
-
-
-@pytest.mark.asyncio
-async def test_generate_foundry_image_dalle3_mode():
-    """Test Foundry image generation with DALL-E 3 model."""
-    with patch("orchestrator.app_settings") as mock_settings, \
-         patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("httpx.AsyncClient") as mock_httpx:
-
-        mock_settings.ai_foundry.use_foundry = True
-        mock_settings.ai_foundry.image_deployment = "dall-e-3"  # DALL-E model
-        mock_settings.azure_openai.endpoint = "https://test.openai.azure.com"
-        mock_settings.azure_openai.image_model = "dall-e-3"
-        mock_settings.azure_openai.preview_api_version = "2024-02-01"
-        mock_settings.azure_openai.image_api_version = "2025-04-01-preview"
-        mock_settings.azure_openai.image_size = "1024x1024"
-        mock_settings.azure_openai.image_quality = "hd"
-        mock_settings.base_settings.azure_client_id = None
-
-        mock_credential = MagicMock()
-        mock_credential.get_token.return_value = MagicMock(token="test-token")
-        mock_cred.return_value = mock_credential
-
-        test_image_data = base64.b64encode(b"dalle3_image").decode()
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "data": [{"b64_json": test_image_data}]
-        }
-
-        mock_client_instance = MagicMock()
-        mock_client_instance.post = AsyncMock(return_value=mock_response)
-        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-        mock_httpx.return_value = mock_client_instance
-
-        orchestrator = ContentGenerationOrchestrator()
-        orchestrator._credential = mock_credential
-        orchestrator._save_image_to_blob = AsyncMock()
-
-        results = {}
-        await orchestrator._generate_foundry_image("A" * 5000, results)  # Long prompt
-
-        # DALL-E 3 should truncate prompt to 4000 chars
-        call_args = mock_client_instance.post.call_args
-        if call_args:
-            payload = call_args.kwargs.get("json", {})
-            prompt_len = len(payload.get("prompt", ""))
-            assert prompt_len <= 4000
-
-
-@pytest.mark.asyncio
-async def test_generate_foundry_image_api_error():
-    """Test Foundry image generation handles API errors."""
-    with patch("orchestrator.app_settings") as mock_settings, \
-         patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("httpx.AsyncClient") as mock_httpx:
-
-        mock_settings.ai_foundry.use_foundry = True
-        mock_settings.ai_foundry.image_deployment = "gpt-image-1-mini"
-        mock_settings.azure_openai.endpoint = "https://test.openai.azure.com"
-        mock_settings.azure_openai.image_model = "gpt-image-1-mini"
-        mock_settings.azure_openai.image_api_version = "2025-04-01-preview"
-        mock_settings.azure_openai.image_size = "1024x1024"
-        mock_settings.azure_openai.image_quality = "medium"
-        mock_settings.base_settings.azure_client_id = None
-
-        mock_credential = MagicMock()
-        mock_credential.get_token.return_value = MagicMock(token="test-token")
-        mock_cred.return_value = mock_credential
-
-        # Mock error HTTP response
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.text = "Internal Server Error"
-
-        mock_client_instance = MagicMock()
-        mock_client_instance.post = AsyncMock(return_value=mock_response)
-        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-        mock_httpx.return_value = mock_client_instance
-
-        orchestrator = ContentGenerationOrchestrator()
-        orchestrator._credential = mock_credential
-
-        results = {}
-        await orchestrator._generate_foundry_image("Create image", results)
-
-        assert "image_error" in results
-        assert "500" in results["image_error"]
-
-
-@pytest.mark.asyncio
-async def test_generate_foundry_image_timeout():
-    """Test Foundry image generation handles timeout."""
-    with patch("orchestrator.app_settings") as mock_settings, \
-         patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("httpx.AsyncClient") as mock_httpx:
-
-        mock_settings.ai_foundry.use_foundry = True
-        mock_settings.ai_foundry.image_deployment = "gpt-image-1-mini"
-        mock_settings.azure_openai.endpoint = "https://test.openai.azure.com"
-        mock_settings.azure_openai.image_model = "gpt-image-1-mini"
-        mock_settings.azure_openai.image_api_version = "2025-04-01-preview"
-        mock_settings.azure_openai.image_size = "1024x1024"
-        mock_settings.azure_openai.image_quality = "medium"
-        mock_settings.base_settings.azure_client_id = None
-
-        mock_credential = MagicMock()
-        mock_credential.get_token.return_value = MagicMock(token="test-token")
-        mock_cred.return_value = mock_credential
-
-        import httpx
-
-        mock_client_instance = MagicMock()
-        mock_client_instance.post = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
-        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-        mock_httpx.return_value = mock_client_instance
-
-        orchestrator = ContentGenerationOrchestrator()
-        orchestrator._credential = mock_credential
-
-        results = {}
-        await orchestrator._generate_foundry_image("Create image", results)
-
-        assert "image_error" in results
-        assert "timed out" in results["image_error"].lower()
-
-
-@pytest.mark.asyncio
-async def test_generate_foundry_image_url_fallback():
-    """Test Foundry image fetches from URL when b64 not provided."""
-    with patch("orchestrator.app_settings") as mock_settings, \
-         patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("httpx.AsyncClient") as mock_httpx:
-
-        mock_settings.ai_foundry.use_foundry = True
-        mock_settings.ai_foundry.image_deployment = "gpt-image-1-mini"
-        mock_settings.azure_openai.endpoint = "https://test.openai.azure.com"
-        mock_settings.azure_openai.image_model = "gpt-image-1-mini"
-        mock_settings.azure_openai.image_api_version = "2025-04-01-preview"
-        mock_settings.azure_openai.image_size = "1024x1024"
-        mock_settings.azure_openai.image_quality = "medium"
-        mock_settings.base_settings.azure_client_id = None
-
-        mock_credential = MagicMock()
-        mock_credential.get_token.return_value = MagicMock(token="test-token")
-        mock_cred.return_value = mock_credential
-
-        # Response with URL instead of b64
-        mock_post_response = MagicMock()
-        mock_post_response.status_code = 200
-        mock_post_response.json.return_value = {
-            "data": [{"url": "https://example.com/image.png"}]
-        }
-
-        # Mock GET response for fetching image from URL
-        mock_get_response = MagicMock()
-        mock_get_response.status_code = 200
-        mock_get_response.content = b"image_bytes_from_url"
-
-        mock_client_instance = MagicMock()
-        mock_client_instance.post = AsyncMock(return_value=mock_post_response)
-        mock_client_instance.get = AsyncMock(return_value=mock_get_response)
-        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-        mock_httpx.return_value = mock_client_instance
-
-        orchestrator = ContentGenerationOrchestrator()
-        orchestrator._credential = mock_credential
-        orchestrator._save_image_to_blob = AsyncMock()
-
-        results = {}
-        await orchestrator._generate_foundry_image("Create image", results)
-
-        # Should have fetched from URL
-        mock_client_instance.get.assert_called_once()
-        orchestrator._save_image_to_blob.assert_called_once()
-
-
-@pytest.mark.asyncio
 async def test_generate_content_with_foundry_image():
-    """Test generate_content generates images in Foundry mode."""
+    """Test generate_content generates images in Foundry mode (uses generate_image)."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
-         patch("orchestrator.HandoffBuilder") as mock_builder:
+         patch("orchestrator.AsyncDefaultAzureCredential") as mock_async_cred, \
+         patch("orchestrator.AzureAIProjectAgentProvider") as mock_provider_cls, \
+         patch("orchestrator.HandoffBuilder") as mock_builder, \
+         patch("agents.image_content_agent.generate_image") as mock_generate_image:
 
         mock_settings.ai_foundry.use_foundry = True
-        mock_settings.ai_foundry.model_deployment = "gpt-4"
-        mock_settings.azure_openai.endpoint = "https://test.openai.azure.com"
-        mock_settings.azure_openai.api_version = "2024-02-15"
-        mock_settings.azure_openai.gpt_model = "gpt-4"
-        mock_settings.azure_openai.gpt_model_mini = "gpt-4-mini"
-        mock_settings.azure_openai.dalle_model = "dall-e-3"
+        mock_settings.ai_foundry.project_endpoint = "https://test.project.azure.com"
+        mock_settings.ai_foundry.agent_names = MOCK_FOUNDRY_AGENT_NAMES
         mock_settings.base_settings.azure_client_id = None
 
-        mock_credential = MagicMock()
-        mock_credential.get_token.return_value = MagicMock(token="test-token")
-        mock_cred.return_value = mock_credential
+        mock_async_cred.return_value = MagicMock()
 
-        mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
-        mock_client.return_value = mock_chat_client
+        mock_provider = MagicMock()
+        mock_provider.get_agent = AsyncMock(return_value=MagicMock())
+        mock_provider_cls.return_value = mock_provider
 
         # Mock agents
         mock_text_agent = AsyncMock()
         mock_text_agent.run.return_value = "Great marketing headline here!"
 
+        mock_image_agent = AsyncMock()
+        mock_image_agent.run.return_value = json.dumps({"prompt": "A beautiful product image"})
+
         mock_compliance_agent = AsyncMock()
         mock_compliance_agent.run.return_value = json.dumps({"violations": []})
 
+        mock_generate_image.return_value = {
+            "success": True,
+            "image_base64": base64.b64encode(b"fake_image").decode(),
+            "revised_prompt": "Enhanced prompt"
+        }
+
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         from models import CreativeBrief
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
-        orchestrator._use_foundry = True
+        await orchestrator.initialize()
         orchestrator._agents["text_content"] = mock_text_agent
+        orchestrator._agents["image_content"] = mock_image_agent
         orchestrator._agents["compliance"] = mock_compliance_agent
-        orchestrator._generate_foundry_image = AsyncMock()
+        orchestrator._save_image_to_blob = AsyncMock()
 
         brief = CreativeBrief(
             overview="Test campaign",
@@ -2121,8 +1808,8 @@ async def test_generate_content_with_foundry_image():
         )
 
         assert result["text_content"] == "Great marketing headline here!"
-        # In Foundry mode, should call _generate_foundry_image
-        orchestrator._generate_foundry_image.assert_called_once()
+        # Foundry mode now uses generate_image like Direct mode
+        mock_generate_image.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -2130,7 +1817,7 @@ async def test_generate_content_direct_mode_image():
     """Test generate_content generates images in Direct mode."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder, \
          patch("agents.image_content_agent.generate_image") as mock_generate_image:
 
@@ -2147,7 +1834,7 @@ async def test_generate_content_direct_mode_image():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_text_agent = AsyncMock()
@@ -2168,15 +1855,17 @@ async def test_generate_content_direct_mode_image():
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         from models import CreativeBrief
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
         orchestrator._use_foundry = False
         orchestrator._agents["text_content"] = mock_text_agent
         orchestrator._agents["image_content"] = mock_image_agent
@@ -2210,7 +1899,7 @@ async def test_regenerate_image_direct_mode():
     """Test regenerate_image in Direct mode."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder, \
          patch("agents.image_content_agent.generate_image") as mock_generate_image:
 
@@ -2227,7 +1916,7 @@ async def test_regenerate_image_direct_mode():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_image_agent = AsyncMock()
@@ -2244,15 +1933,17 @@ async def test_regenerate_image_direct_mode():
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         from models import CreativeBrief
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
         orchestrator._use_foundry = False
         orchestrator._agents["image_content"] = mock_image_agent
         orchestrator._save_image_to_blob = AsyncMock()
@@ -2285,7 +1976,7 @@ async def test_regenerate_image_failure():
     """Test regenerate_image handles generation failure."""
     with patch("orchestrator.app_settings") as mock_settings, \
          patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.AzureOpenAIChatClient") as mock_client, \
+         patch("orchestrator.AzureOpenAIResponsesClient") as mock_client, \
          patch("orchestrator.HandoffBuilder") as mock_builder, \
          patch("agents.image_content_agent.generate_image") as mock_generate_image:
 
@@ -2302,7 +1993,7 @@ async def test_regenerate_image_failure():
         mock_cred.return_value = mock_credential
 
         mock_chat_client = MagicMock()
-        mock_chat_client.create_agent.return_value = MagicMock()
+        mock_chat_client.as_agent.return_value = MagicMock()
         mock_client.return_value = mock_chat_client
 
         mock_image_agent = AsyncMock()
@@ -2316,15 +2007,17 @@ async def test_regenerate_image_failure():
 
         mock_workflow = MagicMock()
         mock_builder_instance = MagicMock()
-        mock_builder_instance.add_agent.return_value = mock_builder_instance
+        mock_builder_instance.participants.return_value = mock_builder_instance
+        mock_builder_instance.with_start_agent.return_value = mock_builder_instance
         mock_builder_instance.add_handoff.return_value = mock_builder_instance
+        mock_builder_instance.with_termination_condition.return_value = mock_builder_instance
         mock_builder_instance.build.return_value = mock_workflow
         mock_builder.return_value = mock_builder_instance
 
         from models import CreativeBrief
 
         orchestrator = ContentGenerationOrchestrator()
-        orchestrator.initialize()
+        await orchestrator.initialize()
         orchestrator._use_foundry = False
         orchestrator._agents["image_content"] = mock_image_agent
 
@@ -2349,8 +2042,7 @@ async def test_regenerate_image_failure():
 async def test_get_chat_client_foundry_no_endpoint():
     """Test _get_chat_client in Foundry mode with missing endpoint raises error."""
     with patch("orchestrator.app_settings") as mock_settings, \
-         patch("orchestrator.DefaultAzureCredential") as mock_cred, \
-         patch("orchestrator.FOUNDRY_AVAILABLE", True):
+         patch("orchestrator.DefaultAzureCredential") as mock_cred:
 
         mock_settings.ai_foundry.use_foundry = True
         mock_settings.ai_foundry.model_deployment = "gpt-4"
@@ -2366,7 +2058,7 @@ async def test_get_chat_client_foundry_no_endpoint():
         orchestrator = ContentGenerationOrchestrator()
         orchestrator._use_foundry = True
 
-        with pytest.raises(ValueError, match="AZURE_OPENAI_ENDPOINT is required"):
+        with pytest.raises(ValueError, match="AZURE_OPENAI_ENDPOINT"):
             orchestrator._get_chat_client()
 
 

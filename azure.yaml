@@ -96,6 +96,42 @@ hooks:
           Write-Host "Warning: post_deploy.py not found, skipping sample data upload" -ForegroundColor Yellow
         }
         
+        # Create agents in Azure AI Foundry (only when USE_FOUNDRY is enabled)
+        if ($env:USE_FOUNDRY -eq "true" -and $env:AZURE_AI_PROJECT_ENDPOINT) {
+          Write-Host ""
+          Write-Host "===== Creating Foundry Agents =====" -ForegroundColor Yellow
+          & $python -m pip install -r ./infra/scripts/agent_scripts/requirements.txt --quiet | Out-Null
+          
+          $solutionName = if ($env:AZURE_AI_SOLUTION_NAME) { $env:AZURE_AI_SOLUTION_NAME } else { "default" }
+          $gptModel = if ($env:AZURE_AI_MODEL_DEPLOYMENT_NAME) { $env:AZURE_AI_MODEL_DEPLOYMENT_NAME } else { $env:AZURE_OPENAI_GPT_MODEL }
+
+          & $python ./infra/scripts/agent_scripts/01_create_agents.py `
+            --ai_project_endpoint $env:AZURE_AI_PROJECT_ENDPOINT `
+            --solution_name $solutionName `
+            --gpt_model_name $gptModel
+          
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Foundry agents created successfully!" -ForegroundColor Green
+
+            # Inject agent name env vars into the ACI now that agents exist
+            Write-Host "Updating ACI with agent environment variables..." -ForegroundColor Yellow
+            $subId = (az account show --query id -o tsv)
+            & $python ./infra/scripts/update_aci_agent_vars.py `
+              --resource_group $env:RESOURCE_GROUP_NAME `
+              --aci_name $env:CONTAINER_INSTANCE_NAME `
+              --solution_name $solutionName `
+              --subscription_id $subId
+
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "ACI updated with agent environment variables!" -ForegroundColor Green
+            } else {
+              Write-Host "Warning: Failed to update ACI with agent env vars — the backend will use fallback agent names" -ForegroundColor Yellow
+            }
+          } else {
+            Write-Host "Foundry agent creation failed — agents will need to be created manually" -ForegroundColor Yellow
+          }
+        }
+        
         Write-Host ""
         Write-Host "===== Deployment Complete =====" -ForegroundColor Green
         Write-Host ""
@@ -140,6 +176,38 @@ hooks:
             || echo "Post-deploy script completed with warnings (some steps may have failed)"
         else
           echo "Warning: post_deploy.py not found, skipping sample data upload"
+        fi
+        
+        # Create agents in Azure AI Foundry (only when USE_FOUNDRY is enabled)
+        if [ "$USE_FOUNDRY" = "true" ] && [ -n "$AZURE_AI_PROJECT_ENDPOINT" ]; then
+          echo ""
+          echo "===== Creating Foundry Agents ====="
+          "$PYTHON_BIN" -m pip install -r ./infra/scripts/agent_scripts/requirements.txt --quiet > /dev/null
+
+          SOLUTION_NAME="${AZURE_AI_SOLUTION_NAME:-default}"
+          GPT_MODEL="${AZURE_AI_MODEL_DEPLOYMENT_NAME:-$AZURE_OPENAI_GPT_MODEL}"
+
+          "$PYTHON_BIN" ./infra/scripts/agent_scripts/01_create_agents.py \
+            --ai_project_endpoint "$AZURE_AI_PROJECT_ENDPOINT" \
+            --solution_name "$SOLUTION_NAME" \
+            --gpt_model_name "$GPT_MODEL"
+
+          if [ $? -eq 0 ]; then
+            echo "Foundry agents created successfully!"
+
+            # Inject agent name env vars into the ACI now that agents exist
+            echo "Updating ACI with agent environment variables..."
+            SUB_ID=$(az account show --query id -o tsv)
+            "$PYTHON_BIN" ./infra/scripts/update_aci_agent_vars.py \
+              --resource_group "$RESOURCE_GROUP_NAME" \
+              --aci_name "$CONTAINER_INSTANCE_NAME" \
+              --solution_name "$SOLUTION_NAME" \
+              --subscription_id "$SUB_ID" \
+              && echo "ACI updated with agent environment variables!" \
+              || echo "Warning: Failed to update ACI with agent env vars — the backend will use fallback agent names"
+          else
+            echo "Foundry agent creation failed - agents will need to be created manually"
+          fi
         fi
         
         echo ""

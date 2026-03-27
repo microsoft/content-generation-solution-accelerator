@@ -887,6 +887,9 @@ module containerInstance 'modules/container-instance.bicep' = {
       { name: 'AZURE_AI_PROJECT_ENDPOINT', value: aiFoundryAiProjectEndpoint }
       { name: 'AZURE_AI_MODEL_DEPLOYMENT_NAME', value: gptModelName }
       { name: 'AZURE_AI_IMAGE_MODEL_DEPLOYMENT', value: imageModelConfig[imageModelChoice].name }
+      { name: 'AZURE_AI_SOLUTION_NAME', value: solutionSuffix }
+      // Note: Agent name env vars (AGENT_NAME_*) are injected by the
+      // postprovision hook ONLY after successful agent creation — see azure.yaml
     ]
   }
 }
@@ -1002,3 +1005,6 @@ output AZURE_AI_MODEL_DEPLOYMENT_NAME string = gptModelName
 
 @description('Contains Azure AI Image Model Deployment Name (empty if none selected)')
 output AZURE_AI_IMAGE_MODEL_DEPLOYMENT string = imageModelConfig[imageModelChoice].name
+
+@description('Contains solution suffix used for agent naming')
+output AZURE_AI_SOLUTION_NAME string = solutionSuffix
