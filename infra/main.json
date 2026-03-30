@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "15389484880957971429"
+      "templateHash": "11471837462839864996"
     },
     "name": "Intelligent Content Generation Accelerator",
     "description": "Solution Accelerator for multimodal marketing content generation using Microsoft Agent Framework.\n"
@@ -33166,11 +33166,11 @@
                 "value": "[format('https://{0}.openai.azure.com/', variables('aiFoundryAiServicesResourceName'))]"
               },
               {
-                "name": "AZURE_OPENAI_GPT_MODEL",
+                "name": "AZURE_ENV_GPT_MODEL_NAME",
                 "value": "[parameters('gptModelName')]"
               },
               {
-                "name": "AZURE_OPENAI_IMAGE_MODEL",
+                "name": "AZURE_ENV_IMAGE_MODEL_NAME",
                 "value": "[variables('imageModelConfig')[parameters('imageModelChoice')].name]"
               },
               {
@@ -33178,7 +33178,7 @@
                 "value": "[if(not(equals(parameters('imageModelChoice'), 'none')), format('https://{0}.openai.azure.com/', variables('aiFoundryAiServicesResourceName')), '')]"
               },
               {
-                "name": "AZURE_OPENAI_API_VERSION",
+                "name": "AZURE_ENV_OPENAI_API_VERSION",
                 "value": "[parameters('azureOpenaiAPIVersion')]"
               },
               {
@@ -33563,7 +33563,7 @@
       },
       "value": "[if(variables('useExistingAiFoundryAiProject'), '', reference('aiFoundryAiServices').outputs.resourceId.value)]"
     },
-    "AZURE_EXISTING_AI_PROJECT_RESOURCE_ID": {
+    "AZURE_ENV_FOUNDRY_PROJECT_RID": {
       "type": "string",
       "metadata": {
         "description": "Contains existing AI project resource ID."
@@ -33605,14 +33605,14 @@
       },
       "value": "[format('https://{0}.openai.azure.com/', variables('aiFoundryAiServicesResourceName'))]"
     },
-    "AZURE_OPENAI_GPT_MODEL": {
+    "AZURE_ENV_GPT_MODEL_NAME": {
       "type": "string",
       "metadata": {
         "description": "Contains GPT Model"
       },
       "value": "[parameters('gptModelName')]"
     },
-    "AZURE_OPENAI_IMAGE_MODEL": {
+    "AZURE_ENV_IMAGE_MODEL_NAME": {
       "type": "string",
       "metadata": {
         "description": "Contains Image Model (empty if none selected)"
@@ -33626,7 +33626,7 @@
       },
       "value": "[if(not(equals(parameters('imageModelChoice'), 'none')), format('https://{0}.openai.azure.com/', variables('aiFoundryAiServicesResourceName')), '')]"
     },
-    "AZURE_OPENAI_API_VERSION": {
+    "AZURE_ENV_OPENAI_API_VERSION": {
       "type": "string",
       "metadata": {
         "description": "Contains Azure OpenAI API Version"
@@ -33661,7 +33661,7 @@
       },
       "value": "[if(and(parameters('enableMonitoring'), not(variables('useExistingLogAnalytics'))), reference('applicationInsights').outputs.connectionString.value, '')]"
     },
-    "AZURE_ENV_OPENAI_LOCATION": {
+    "AZURE_ENV_AI_SERVICE_LOCATION": {
       "type": "string",
       "metadata": {
         "description": "Contains the location used for AI Services deployment"
@@ -33689,7 +33689,7 @@
       },
       "value": "[if(parameters('enablePrivateNetworking'), '', reference('containerInstance').outputs.fqdn.value)]"
     },
-    "ACR_NAME": {
+    "AZURE_ENV_CONTAINER_REGISTRY_NAME": {
       "type": "string",
       "metadata": {
         "description": "Contains ACR Name"

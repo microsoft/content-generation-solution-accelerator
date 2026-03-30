@@ -105,7 +105,7 @@ ensure_azure_ai_user_role() {
     local existing_project_id=""
     local foundry_resource_id=""
     if [ -f ".env" ]; then
-        existing_project_id=$(grep "^AZURE_EXISTING_AI_PROJECT_RESOURCE_ID=" .env | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
+        existing_project_id=$(grep "^AZURE_ENV_FOUNDRY_PROJECT_RID=" .env | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
         foundry_resource_id=$(grep "^AI_FOUNDRY_RESOURCE_ID=" .env | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
     fi
     
@@ -115,7 +115,7 @@ ensure_azure_ai_user_role() {
     elif [ -n "$foundry_resource_id" ]; then
         scope="$foundry_resource_id"
     else
-        print_error "Neither AZURE_EXISTING_AI_PROJECT_RESOURCE_ID nor AI_FOUNDRY_RESOURCE_ID found in .env"
+        print_error "Neither AZURE_ENV_FOUNDRY_PROJECT_RID nor AI_FOUNDRY_RESOURCE_ID found in .env"
         exit 1
     fi
     

@@ -109,7 +109,7 @@ function Ensure-AzureAIUserRole {
     $foundryResourceId = $null
     if (Test-Path ".env") {
         Get-Content ".env" | ForEach-Object {
-            if ($_ -match "^AZURE_EXISTING_AI_PROJECT_RESOURCE_ID=(.*)$") { $existingProjectId = $matches[1].Trim('"').Trim("'") }
+            if ($_ -match "^AZURE_ENV_FOUNDRY_PROJECT_RID=(.*)$") { $existingProjectId = $matches[1].Trim('"').Trim("'") }
             if ($_ -match "^AI_FOUNDRY_RESOURCE_ID=(.*)$") { $foundryResourceId = $matches[1].Trim('"').Trim("'") }
         }
     }
@@ -121,7 +121,7 @@ function Ensure-AzureAIUserRole {
     } elseif ($foundryResourceId) {
         $scope = $foundryResourceId
     } else {
-        Write-Error "Neither AZURE_EXISTING_AI_PROJECT_RESOURCE_ID nor AI_FOUNDRY_RESOURCE_ID found in .env"
+        Write-Error "Neither AZURE_ENV_FOUNDRY_PROJECT_RID nor AI_FOUNDRY_RESOURCE_ID found in .env"
         exit 1
     }
     

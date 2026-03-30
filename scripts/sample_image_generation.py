@@ -9,7 +9,7 @@ Prerequisites:
 1. Set up environment variables (or use a .env file):
    - AZURE_OPENAI_ENDPOINT: Your Azure OpenAI endpoint
     - AZURE_OPENAI_GPT_IMAGE_ENDPOINT: (Optional) Dedicated GPT image endpoint
-    - AZURE_OPENAI_IMAGE_MODEL: Use "gpt-image-1-mini" or "gpt-image-1.5"
+    - AZURE_ENV_IMAGE_MODEL_NAME: Use "gpt-image-1-mini" or "gpt-image-1.5"
    
 2. Ensure you have RBAC access:
    - "Cognitive Services OpenAI User" role on the Azure OpenAI resource

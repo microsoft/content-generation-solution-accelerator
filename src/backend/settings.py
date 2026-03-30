@@ -10,7 +10,7 @@ import logging
 import os
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Self
 
@@ -87,12 +87,18 @@ class _AzureOpenAISettings(BaseSettings):
         env_ignore_empty=True,
     )
 
-    gpt_model: str = Field(default="gpt-5", alias="AZURE_OPENAI_GPT_MODEL")
+    gpt_model: str = Field(
+        default="gpt-5",
+        validation_alias=AliasChoices("AZURE_ENV_GPT_MODEL_NAME", "AZURE_OPENAI_GPT_MODEL")
+    )
     model: str = "gpt-5"
 
     # Image generation model settings
     # Supported models: "gpt-image-1-mini" or "gpt-image-1.5"
-    image_model: str = Field(default="gpt-image-1-mini", alias="AZURE_OPENAI_IMAGE_MODEL")
+    image_model: str = Field(
+        default="gpt-image-1-mini",
+        validation_alias=AliasChoices("AZURE_ENV_IMAGE_MODEL_NAME", "AZURE_OPENAI_IMAGE_MODEL")
+    )
 
     # gpt-image-1-mini or gpt-image-1.5 specific endpoint
     gpt_image_endpoint: Optional[str] = Field(default=None, alias="AZURE_OPENAI_GPT_IMAGE_ENDPOINT")
@@ -103,7 +109,10 @@ class _AzureOpenAISettings(BaseSettings):
     top_p: float = 0.95
     max_tokens: int = 2000
     stream: bool = True
-    api_version: str = "2024-06-01"
+    api_version: str = Field(
+        default="2024-06-01",
+        validation_alias=AliasChoices("AZURE_ENV_OPENAI_API_VERSION", "AZURE_OPENAI_API_VERSION")
+    )
     preview_api_version: str = "2024-02-01"
     image_api_version: str = Field(default="2025-04-01-preview", alias="AZURE_OPENAI_IMAGE_API_VERSION")
 

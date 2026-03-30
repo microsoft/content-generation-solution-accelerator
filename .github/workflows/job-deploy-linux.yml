@@ -6,7 +6,7 @@ on:
       ENV_NAME:
         required: true
         type: string
-      AZURE_ENV_OPENAI_LOCATION:
+      AZURE_ENV_AI_SERVICE_LOCATION:
         required: true
         type: string
       AZURE_LOCATION:
@@ -15,7 +15,7 @@ on:
       RESOURCE_GROUP_NAME:
         required: true
         type: string
-      IMAGE_TAG:
+      AZURE_ENV_IMAGE_TAG:
         required: true
         type: string
       BUILD_DOCKER_IMAGE:
@@ -28,10 +28,10 @@ on:
         required: false
         type: string
         default: 'false'
-      AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID:
+      AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID:
         required: false
         type: string
-      AZURE_EXISTING_AI_PROJECT_RESOURCE_ID:
+      AZURE_ENV_FOUNDRY_PROJECT_RID:
         required: false
         type: string
     outputs:
@@ -52,15 +52,15 @@ jobs:
         shell: bash
         env:
           INPUT_ENV_NAME: ${{ inputs.ENV_NAME }}
-          INPUT_AZURE_ENV_OPENAI_LOCATION: ${{ inputs.AZURE_ENV_OPENAI_LOCATION }}
+          INPUT_AZURE_ENV_AI_SERVICE_LOCATION: ${{ inputs.AZURE_ENV_AI_SERVICE_LOCATION }}
           INPUT_AZURE_LOCATION: ${{ inputs.AZURE_LOCATION }}
           INPUT_RESOURCE_GROUP_NAME: ${{ inputs.RESOURCE_GROUP_NAME }}
-          INPUT_IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+          INPUT_AZURE_ENV_IMAGE_TAG: ${{ inputs.AZURE_ENV_IMAGE_TAG }}
           INPUT_BUILD_DOCKER_IMAGE: ${{ inputs.BUILD_DOCKER_IMAGE }}
           INPUT_EXP: ${{ inputs.EXP }}
           INPUT_WAF_ENABLED: ${{ inputs.WAF_ENABLED }}
-          INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID: ${{ inputs.AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID }}
-          INPUT_AZURE_EXISTING_AI_PROJECT_RESOURCE_ID: ${{ inputs.AZURE_EXISTING_AI_PROJECT_RESOURCE_ID }}
+          INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID: ${{ inputs.AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID }}
+          INPUT_AZURE_ENV_FOUNDRY_PROJECT_RID: ${{ inputs.AZURE_ENV_FOUNDRY_PROJECT_RID }}
         run: |
           echo "🔍 Validating workflow input parameters..."
           VALIDATION_FAILED=false
@@ -76,15 +76,15 @@ jobs:
             echo "✅ ENV_NAME: '$INPUT_ENV_NAME' is valid"
           fi
           
-          # Validate AZURE_ENV_OPENAI_LOCATION (required, Azure region format)
-          if [[ -z "$INPUT_AZURE_ENV_OPENAI_LOCATION" ]]; then
-            echo "❌ ERROR: AZURE_ENV_OPENAI_LOCATION is required but not provided"
+          # Validate AZURE_ENV_AI_SERVICE_LOCATION (required, Azure region format)
+          if [[ -z "$INPUT_AZURE_ENV_AI_SERVICE_LOCATION" ]]; then
+            echo "❌ ERROR: AZURE_ENV_AI_SERVICE_LOCATION is required but not provided"
             VALIDATION_FAILED=true
-          elif [[ ! "$INPUT_AZURE_ENV_OPENAI_LOCATION" =~ ^[a-z0-9]+$ ]]; then
-            echo "❌ ERROR: AZURE_ENV_OPENAI_LOCATION '$INPUT_AZURE_ENV_OPENAI_LOCATION' is invalid. Must contain only lowercase letters and numbers"
+          elif [[ ! "$INPUT_AZURE_ENV_AI_SERVICE_LOCATION" =~ ^[a-z0-9]+$ ]]; then
+            echo "❌ ERROR: AZURE_ENV_AI_SERVICE_LOCATION '$INPUT_AZURE_ENV_AI_SERVICE_LOCATION' is invalid. Must contain only lowercase letters and numbers"
             VALIDATION_FAILED=true
           else
-            echo "✅ AZURE_ENV_OPENAI_LOCATION: '$INPUT_AZURE_ENV_OPENAI_LOCATION' is valid"
+            echo "✅ AZURE_ENV_AI_SERVICE_LOCATION: '$INPUT_AZURE_ENV_AI_SERVICE_LOCATION' is valid"
           fi
           
           # Validate AZURE_LOCATION (required, Azure region format)
@@ -112,15 +112,15 @@ jobs:
             echo "✅ RESOURCE_GROUP_NAME: '$INPUT_RESOURCE_GROUP_NAME' is valid"
           fi
           
-          # Validate IMAGE_TAG (required, Docker tag pattern)
-          if [[ -z "$INPUT_IMAGE_TAG" ]]; then
-            echo "❌ ERROR: IMAGE_TAG is required but not provided"
+          # Validate AZURE_ENV_IMAGE_TAG (required, Docker tag pattern)
+          if [[ -z "$INPUT_AZURE_ENV_IMAGE_TAG" ]]; then
+            echo "❌ ERROR: AZURE_ENV_IMAGE_TAG is required but not provided"
             VALIDATION_FAILED=true
-          elif [[ ! "$INPUT_IMAGE_TAG" =~ ^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$ ]]; then
-            echo "❌ ERROR: IMAGE_TAG '$INPUT_IMAGE_TAG' is invalid. Must start with alphanumeric or underscore, max 128 characters"
+          elif [[ ! "$INPUT_AZURE_ENV_IMAGE_TAG" =~ ^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$ ]]; then
+            echo "❌ ERROR: AZURE_ENV_IMAGE_TAG '$INPUT_AZURE_ENV_IMAGE_TAG' is invalid. Must start with alphanumeric or underscore, max 128 characters"
             VALIDATION_FAILED=true
           else
-            echo "✅ IMAGE_TAG: '$INPUT_IMAGE_TAG' is valid"
+            echo "✅ AZURE_ENV_IMAGE_TAG: '$INPUT_AZURE_ENV_IMAGE_TAG' is valid"
           fi
           
           # Validate BUILD_DOCKER_IMAGE (required, must be 'true' or 'false')
@@ -147,27 +147,27 @@ jobs:
             echo "✅ WAF_ENABLED: '$INPUT_WAF_ENABLED' is valid"
           fi
           
-          # Validate AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID (optional, if provided must be valid Resource ID)
-          if [[ -n "$INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID" ]]; then
-            if [[ ! "$INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID" =~ ^/subscriptions/[a-fA-F0-9-]+/[Rr]esource[Gg]roups/[^/]+/providers/[Mm]icrosoft\.[Oo]perational[Ii]nsights/[Ww]orkspaces/[^/]+$ ]]; then
-              echo "❌ ERROR: AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID is invalid. Must be a valid Azure Resource ID format:"
+          # Validate AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID (optional, if provided must be valid Resource ID)
+          if [[ -n "$INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID" ]]; then
+            if [[ ! "$INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID" =~ ^/subscriptions/[a-fA-F0-9-]+/[Rr]esource[Gg]roups/[^/]+/providers/[Mm]icrosoft\.[Oo]perational[Ii]nsights/[Ww]orkspaces/[^/]+$ ]]; then
+              echo "❌ ERROR: AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID is invalid. Must be a valid Azure Resource ID format:"
               echo "   /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.OperationalInsights/workspaces/{workspaceName}"
-              echo "   Got: '$INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID'"
+              echo "   Got: '$INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID'"
               VALIDATION_FAILED=true
             else
-              echo "✅ AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID: Valid Resource ID format"
+              echo "✅ AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID: Valid Resource ID format"
             fi
           fi
           
-          # Validate AZURE_EXISTING_AI_PROJECT_RESOURCE_ID (optional, if provided must be valid Resource ID)
-          if [[ -n "$INPUT_AZURE_EXISTING_AI_PROJECT_RESOURCE_ID" ]]; then
-            if [[ ! "$INPUT_AZURE_EXISTING_AI_PROJECT_RESOURCE_ID" =~ ^/subscriptions/[a-fA-F0-9-]+/[Rr]esource[Gg]roups/[^/]+/providers/([Mm]icrosoft\.[Mm]achine[Ll]earning[Ss]ervices/([Ww]orkspaces|[Pp]rojects)/[^/]+|[Mm]icrosoft\.[Cc]ognitive[Ss]ervices/[Aa]ccounts/[^/]+/[Pp]rojects/[^/]+)$ ]]; then
-              echo "❌ ERROR: AZURE_EXISTING_AI_PROJECT_RESOURCE_ID is invalid. Must be a valid Azure Resource ID format:"
+          # Validate AZURE_ENV_FOUNDRY_PROJECT_RID (optional, if provided must be valid Resource ID)
+          if [[ -n "$INPUT_AZURE_ENV_FOUNDRY_PROJECT_RID" ]]; then
+            if [[ ! "$INPUT_AZURE_ENV_FOUNDRY_PROJECT_RID" =~ ^/subscriptions/[a-fA-F0-9-]+/[Rr]esource[Gg]roups/[^/]+/providers/([Mm]icrosoft\.[Mm]achine[Ll]earning[Ss]ervices/([Ww]orkspaces|[Pp]rojects)/[^/]+|[Mm]icrosoft\.[Cc]ognitive[Ss]ervices/[Aa]ccounts/[^/]+/[Pp]rojects/[^/]+)$ ]]; then
+              echo "❌ ERROR: AZURE_ENV_FOUNDRY_PROJECT_RID is invalid. Must be a valid Azure Resource ID format:"
               echo "   /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.CognitiveServices/accounts/{accountName}/projects/{projectName}"
-              echo "   Got: '$INPUT_AZURE_EXISTING_AI_PROJECT_RESOURCE_ID'"
+              echo "   Got: '$INPUT_AZURE_ENV_FOUNDRY_PROJECT_RID'"
               VALIDATION_FAILED=true
             else
-              echo "✅ AZURE_EXISTING_AI_PROJECT_RESOURCE_ID: Valid Resource ID format"
+              echo "✅ AZURE_ENV_FOUNDRY_PROJECT_RID: Valid Resource ID format"
             fi
           fi
           
@@ -215,14 +215,14 @@ jobs:
         shell: bash
         env:
           ENV_NAME: ${{ inputs.ENV_NAME }}
-          AZURE_ENV_OPENAI_LOCATION: ${{ inputs.AZURE_ENV_OPENAI_LOCATION }}
+          AZURE_ENV_AI_SERVICE_LOCATION: ${{ inputs.AZURE_ENV_AI_SERVICE_LOCATION }}
           AZURE_LOCATION: ${{ inputs.AZURE_LOCATION }}
           RESOURCE_GROUP_NAME: ${{ inputs.RESOURCE_GROUP_NAME }}
-          IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+          AZURE_ENV_IMAGE_TAG: ${{ inputs.AZURE_ENV_IMAGE_TAG }}
           BUILD_DOCKER_IMAGE: ${{ inputs.BUILD_DOCKER_IMAGE }}
           EXP: ${{ inputs.EXP }}
-          INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID: ${{ inputs.AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID }}
-          INPUT_AZURE_EXISTING_AI_PROJECT_RESOURCE_ID: ${{ inputs.AZURE_EXISTING_AI_PROJECT_RESOURCE_ID }}
+          INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID: ${{ inputs.AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID }}
+          INPUT_AZURE_ENV_FOUNDRY_PROJECT_RID: ${{ inputs.AZURE_ENV_FOUNDRY_PROJECT_RID }}
         run: |
           set -e
 
@@ -235,17 +235,17 @@ jobs:
           
           # Set additional parameters
           azd env set AZURE_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-          azd env set AZURE_ENV_OPENAI_LOCATION="$AZURE_ENV_OPENAI_LOCATION"
+          azd env set AZURE_ENV_AI_SERVICE_LOCATION="$AZURE_ENV_AI_SERVICE_LOCATION"
           azd env set AZURE_LOCATION="$AZURE_LOCATION"
           azd env set AZURE_RESOURCE_GROUP="$RESOURCE_GROUP_NAME"
-          azd env set IMAGE_TAG="$IMAGE_TAG"
+          azd env set AZURE_ENV_IMAGE_TAG="$AZURE_ENV_IMAGE_TAG"
           
           # Set ACR name only when building Docker image
           if [[ "$BUILD_DOCKER_IMAGE" == "true" ]]; then
             # Extract ACR name from login server and set as environment variable
-            ACR_NAME=$(echo "${{ secrets.ACR_TEST_LOGIN_SERVER }}" | cut -d'.' -f1)
-            azd env set ACR_NAME="$ACR_NAME"
-            echo "Set ACR name to: $ACR_NAME"
+            AZURE_ENV_CONTAINER_REGISTRY_NAME=$(echo "${{ secrets.ACR_TEST_LOGIN_SERVER }}" | cut -d'.' -f1)
+            azd env set AZURE_ENV_CONTAINER_REGISTRY_NAME="$AZURE_ENV_CONTAINER_REGISTRY_NAME"
+            echo "Set ACR name to: $AZURE_ENV_CONTAINER_REGISTRY_NAME"
           else
             echo "Skipping ACR name configuration (using existing image)"
           fi
@@ -254,25 +254,25 @@ jobs:
             echo "✅ EXP ENABLED - Setting EXP parameters..."
             
             # Set EXP variables dynamically
-            if [[ -n "$INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID" ]]; then
-              EXP_LOG_ANALYTICS_ID="$INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID"
+            if [[ -n "$INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID" ]]; then
+              EXP_LOG_ANALYTICS_ID="$INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID"
             else
-              EXP_LOG_ANALYTICS_ID="${{ secrets.AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID }}"
+              EXP_LOG_ANALYTICS_ID="${{ secrets.AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID }}"
             fi
             
-            if [[ -n "$INPUT_AZURE_EXISTING_AI_PROJECT_RESOURCE_ID" ]]; then
-              EXP_AI_PROJECT_ID="$INPUT_AZURE_EXISTING_AI_PROJECT_RESOURCE_ID"
+            if [[ -n "$INPUT_AZURE_ENV_FOUNDRY_PROJECT_RID" ]]; then
+              EXP_AI_PROJECT_ID="$INPUT_AZURE_ENV_FOUNDRY_PROJECT_RID"
             else
-              EXP_AI_PROJECT_ID="${{ secrets.AZURE_EXISTING_AI_PROJECT_RESOURCE_ID }}"
+              EXP_AI_PROJECT_ID="${{ secrets.AZURE_ENV_FOUNDRY_PROJECT_RID }}"
             fi
             
-            echo "AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID: $EXP_LOG_ANALYTICS_ID"
-            echo "AZURE_EXISTING_AI_PROJECT_RESOURCE_ID: $EXP_AI_PROJECT_ID"
-            azd env set AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID="$EXP_LOG_ANALYTICS_ID"
-            azd env set AZURE_EXISTING_AI_PROJECT_RESOURCE_ID="$EXP_AI_PROJECT_ID"
+            echo "AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID: $EXP_LOG_ANALYTICS_ID"
+            echo "AZURE_ENV_FOUNDRY_PROJECT_RID: $EXP_AI_PROJECT_ID"
+            azd env set AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID="$EXP_LOG_ANALYTICS_ID"
+            azd env set AZURE_ENV_FOUNDRY_PROJECT_RID="$EXP_AI_PROJECT_ID"
           else
             echo "❌ EXP DISABLED - Skipping EXP parameters"
-            if [[ -n "$INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID" ]] || [[ -n "$INPUT_AZURE_EXISTING_AI_PROJECT_RESOURCE_ID" ]]; then
+            if [[ -n "$INPUT_AZURE_ENV_LOG_ANALYTICS_WORKSPACE_RID" ]] || [[ -n "$INPUT_AZURE_ENV_FOUNDRY_PROJECT_RID" ]]; then
               echo "⚠️  Warning: EXP parameter values provided but EXP is disabled. These values will be ignored."
             fi
           fi
@@ -292,8 +292,8 @@ jobs:
           WAF_ENABLED: ${{ inputs.WAF_ENABLED }}
           EXP: ${{ inputs.EXP }}
           AZURE_LOCATION: ${{ inputs.AZURE_LOCATION }}
-          AZURE_ENV_OPENAI_LOCATION: ${{ inputs.AZURE_ENV_OPENAI_LOCATION }}
-          IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+          AZURE_ENV_AI_SERVICE_LOCATION: ${{ inputs.AZURE_ENV_AI_SERVICE_LOCATION }}
+          AZURE_ENV_IMAGE_TAG: ${{ inputs.AZURE_ENV_IMAGE_TAG }}
           JOB_STATUS: ${{ job.status }}
           WEB_APP_URL: ${{ steps.get_output_linux.outputs.WEB_APP_URL }}
         run: |
@@ -323,8 +323,8 @@ jobs:
           echo "| **Configuration Type** | \`$CONFIG_TYPE\` |" >> $GITHUB_STEP_SUMMARY
           
           echo "| **Azure Region (Infrastructure)** | \`$AZURE_LOCATION\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Azure OpenAI Region** | \`$AZURE_ENV_OPENAI_LOCATION\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Docker Image Tag** | \`$IMAGE_TAG\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Azure OpenAI Region** | \`$AZURE_ENV_AI_SERVICE_LOCATION\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Docker Image Tag** | \`$AZURE_ENV_IMAGE_TAG\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [[ "$JOB_STATUS" == "success" ]]; then

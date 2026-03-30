@@ -42,10 +42,10 @@ Set-Location $ProjectDir
 # Configuration from environment or prompt
 $ResourceGroup = if ($env:RESOURCE_GROUP) { $env:RESOURCE_GROUP } else { $null }
 $Location = if ($env:LOCATION) { $env:LOCATION } else { "eastus" }
-$AcrName = if ($env:ACR_NAME) { $env:ACR_NAME } else { $null }
+$AcrName = if ($env:AZURE_ENV_CONTAINER_REGISTRY_NAME) { $env:AZURE_ENV_CONTAINER_REGISTRY_NAME } else { $null }
 $ContainerName = if ($env:CONTAINER_NAME) { $env:CONTAINER_NAME } else { "aci-contentgen-backend" }
 $AppServiceName = if ($env:APP_SERVICE_NAME) { $env:APP_SERVICE_NAME } else { $null }
-$ImageTag = if ($env:IMAGE_TAG) { $env:IMAGE_TAG } else { "latest" }
+$ImageTag = if ($env:AZURE_ENV_IMAGE_TAG) { $env:AZURE_ENV_IMAGE_TAG } else { "latest" }
 
 Write-Host ""
 Write-Host "Current configuration:"

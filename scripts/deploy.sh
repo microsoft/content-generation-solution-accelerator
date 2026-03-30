@@ -39,19 +39,19 @@ cd "$PROJECT_DIR"
 # Default configuration
 RESOURCE_GROUP="${RESOURCE_GROUP:-}"
 LOCATION="${LOCATION:-eastus}"
-ACR_NAME="${ACR_NAME:-}"
+AZURE_ENV_CONTAINER_REGISTRY_NAME="${AZURE_ENV_CONTAINER_REGISTRY_NAME:-}"
 CONTAINER_NAME="${CONTAINER_NAME:-aci-contentgen-backend}"
 APP_SERVICE_NAME="${APP_SERVICE_NAME:-}"
-IMAGE_TAG="${IMAGE_TAG:-latest}"
+AZURE_ENV_IMAGE_TAG="${AZURE_ENV_IMAGE_TAG:-latest}"
 
 echo ""
 echo "Current configuration:"
 echo "  Resource Group: ${RESOURCE_GROUP:-<not set>}"
 echo "  Location: $LOCATION"
-echo "  ACR Name: ${ACR_NAME:-<not set>}"
+echo "  ACR Name: ${AZURE_ENV_CONTAINER_REGISTRY_NAME:-<not set>}"
 echo "  Container Name: $CONTAINER_NAME"
 echo "  App Service: ${APP_SERVICE_NAME:-<not set>}"
-echo "  Image Tag: $IMAGE_TAG"
+echo "  Image Tag: $AZURE_ENV_IMAGE_TAG"
 echo ""
 
 # Prompt for missing values
@@ -59,8 +59,8 @@ if [ -z "$RESOURCE_GROUP" ]; then
     read -p "Enter Resource Group name: " RESOURCE_GROUP
 fi
 
-if [ -z "$ACR_NAME" ]; then
-    read -p "Enter Azure Container Registry name: " ACR_NAME
+if [ -z "$AZURE_ENV_CONTAINER_REGISTRY_NAME" ]; then
+    read -p "Enter Azure Container Registry name: " AZURE_ENV_CONTAINER_REGISTRY_NAME
 fi
 
 if [ -z "$APP_SERVICE_NAME" ]; then
@@ -97,16 +97,16 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     cd "$PROJECT_DIR/src"
     
     # Login to ACR
-    az acr login --name "$ACR_NAME"
+    az acr login --name "$AZURE_ENV_CONTAINER_REGISTRY_NAME"
     
     # Build and push using ACR tasks
     az acr build \
-        --registry "$ACR_NAME" \
-        --image "contentgen-backend:$IMAGE_TAG" \
+        --registry "$AZURE_ENV_CONTAINER_REGISTRY_NAME" \
+        --image "contentgen-backend:$AZURE_ENV_IMAGE_TAG" \
         --file WebApp.Dockerfile \
         .
     
-    echo "✓ Container built and pushed to $ACR_NAME.azurecr.io/contentgen-backend:$IMAGE_TAG"
+    echo "✓ Container built and pushed to $AZURE_ENV_CONTAINER_REGISTRY_NAME.azurecr.io/contentgen-backend:$AZURE_ENV_IMAGE_TAG"
     
     # Step 2: Get the current container's managed identity
     echo ""

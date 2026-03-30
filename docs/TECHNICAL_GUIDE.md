@@ -156,9 +156,9 @@ See `src/backend/settings.py` for all configuration options. Key settings:
 | Variable | Description |
 |----------|-------------|
 | `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint for GPT model |
-| `AZURE_OPENAI_GPT_MODEL` | GPT model deployment name |
+| `AZURE_ENV_GPT_MODEL_NAME` | GPT model deployment name |
 | `AZURE_OPENAI_GPT_IMAGE_ENDPOINT` | Azure OpenAI endpoint for GPT image model (if separate) |
-| `AZURE_OPENAI_IMAGE_MODEL` | GPT image model deployment name (gpt-image-1-mini) |
+| `AZURE_ENV_IMAGE_MODEL_NAME` | GPT image model deployment name (gpt-image-1-mini) |
 | `AZURE_COSMOS_ENDPOINT` | Azure Cosmos DB endpoint |
 | `AZURE_COSMOS_DATABASE_NAME` | Cosmos DB database name |
 | `AZURE_BLOB_ACCOUNT_NAME` | Storage account name |

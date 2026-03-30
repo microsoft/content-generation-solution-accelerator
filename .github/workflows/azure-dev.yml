@@ -44,7 +44,7 @@ jobs:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           AZURE_ENV_NAME: ${{ secrets.AZURE_ENV_NAME }}
           AZURE_LOCATION: ${{ secrets.AZURE_LOCATION }}
-          AZURE_ENV_OPENAI_LOCATION: ${{ secrets.AZURE_ENV_OPENAI_LOCATION }}
+          AZURE_ENV_AI_SERVICE_LOCATION: ${{ secrets.AZURE_ENV_AI_SERVICE_LOCATION }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
  
       # Step 4: Print the result of the validation

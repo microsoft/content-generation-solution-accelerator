@@ -66,7 +66,7 @@ hooks:
         Write-Host "AI Search Index: " -NoNewline
         Write-Host "$env:AZURE_AI_SEARCH_PRODUCTS_INDEX" -ForegroundColor Cyan
         Write-Host "AI Service Location: " -NoNewline
-        Write-Host "$env:AZURE_ENV_OPENAI_LOCATION" -ForegroundColor Cyan
+        Write-Host "$env:AZURE_ENV_AI_SERVICE_LOCATION" -ForegroundColor Cyan
         Write-Host "Container Instance: " -NoNewline
         Write-Host "$env:CONTAINER_INSTANCE_NAME" -ForegroundColor Cyan     
         
@@ -112,11 +112,11 @@ hooks:
         echo "Storage Account: $AZURE_BLOB_ACCOUNT_NAME"
         echo "AI Search Service: $AI_SEARCH_SERVICE_NAME"
         echo "AI Search Index: $AZURE_AI_SEARCH_PRODUCTS_INDEX"
-        echo "AI Service Location: $AZURE_ENV_OPENAI_LOCATION"
+        echo "AI Service Location: $AZURE_ENV_AI_SERVICE_LOCATION"
         echo "Container Instance: $CONTAINER_INSTANCE_NAME"
         
         echo ""
-        echo "Container Registry: $ACR_NAME"
+        echo "Container Registry: $AZURE_ENV_CONTAINER_REGISTRY_NAME"
         
         # Run post-deploy script to upload sample data and create search index
         echo ""

@@ -218,7 +218,7 @@ az webapp config set -g $RESOURCE_GROUP -n <app-name> --http20-enabled false
 
 **Solution**: 
 1. Verify GPT-Image-1-mini or GPT-Image-1.5 deployment exists in Azure OpenAI resource
-2. Check `AZURE_OPENAI_IMAGE_MODEL` and `AZURE_OPENAI_GPT_IMAGE_ENDPOINT` environment variables
+2. Check `AZURE_ENV_IMAGE_MODEL_NAME` and `AZURE_OPENAI_GPT_IMAGE_ENDPOINT` environment variables
 
 </details>
 

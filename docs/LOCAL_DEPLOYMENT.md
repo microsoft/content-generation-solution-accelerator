@@ -147,10 +147,10 @@ Changes to source files will automatically trigger a reload.
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `AZURE_OPENAI_ENDPOINT` | Yes | Azure OpenAI endpoint URL (e.g., `https://your-resource.openai.azure.com/`) |
-| `AZURE_OPENAI_GPT_MODEL` | Yes | GPT model deployment name (e.g., `gpt-4o`, `gpt-5.1`) |
-| `AZURE_OPENAI_IMAGE_MODEL` | Yes | Image generation model (`gpt-image-1-mini` or `gpt-image-1.5`) |
+| `AZURE_ENV_GPT_MODEL_NAME` | Yes | GPT model deployment name (e.g., `gpt-4o`, `gpt-5.1`) |
+| `AZURE_ENV_IMAGE_MODEL_NAME` | Yes | Image generation model (`gpt-image-1-mini` or `gpt-image-1.5`) |
 | `AZURE_OPENAI_GPT_IMAGE_ENDPOINT` | No | Separate endpoint for gpt-image-1-mini (if different from main endpoint) |
-| `AZURE_OPENAI_API_VERSION` | Yes | API version (e.g., `2024-06-01`) |
+| `AZURE_ENV_OPENAI_API_VERSION` | Yes | API version (e.g., `2024-06-01`) |
 | `AZURE_OPENAI_TEMPERATURE` | No | Generation temperature (default: `0.7`) |
 | `AZURE_OPENAI_MAX_TOKENS` | No | Max tokens for generation (default: `2000`) |
 
@@ -228,12 +228,12 @@ Changes to source files will automatically trigger a reload.
 ```dotenv
 # Azure OpenAI
 AZURE_OPENAI_ENDPOINT=https://my-openai.openai.azure.com/
-AZURE_OPENAI_GPT_MODEL=gpt-4o
-AZURE_OPENAI_IMAGE_MODEL=gpt-image-1-mini
+AZURE_ENV_GPT_MODEL_NAME=gpt-4o
+AZURE_ENV_IMAGE_MODEL_NAME=gpt-image-1-mini
 AZURE_OPENAI_GPT_IMAGE_ENDPOINT=https://my-openai.openai.azure.com
 AZURE_OPENAI_IMAGE_SIZE=1024x1024
 AZURE_OPENAI_IMAGE_QUALITY=medium
-AZURE_OPENAI_API_VERSION=2024-06-01
+AZURE_ENV_OPENAI_API_VERSION=2024-06-01
 
 # Cosmos DB
 AZURE_COSMOS_ENDPOINT=https://my-cosmos.documents.azure.com:443/
