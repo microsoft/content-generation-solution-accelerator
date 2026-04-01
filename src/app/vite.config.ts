@@ -23,7 +23,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../static',
+    outDir: './static',
     emptyOutDir: true,
   },
 });

@@ -35,8 +35,8 @@ updates:
   # npm dependencies - grouped
   - package-ecosystem: "npm"
     directories:
-      - "/src/app/frontend"
-      - "/src/app/frontend-server"
+      - "/src/app"
+      - "/src/app/server"
     schedule:
       interval: "monthly"
     target-branch: "dependabotchanges"

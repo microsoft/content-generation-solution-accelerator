@@ -1,7 +1,7 @@
 # ============================================
 # Frontend Dockerfile
 # Multi-stage build for Content Generation Frontend
-# Combines: frontend (React/Vite) + frontend-server (Node.js proxy)
+# Combines: React/Vite frontend + server (Node.js proxy)
 # ============================================
 
 # ============================================
@@ -11,14 +11,14 @@ FROM node:20-alpine AS frontend-build
 
 WORKDIR /app
 
-# Copy frontend package files
-COPY frontend/package*.json ./
+# Copy package files
+COPY package*.json ./
 
 # Install dependencies
 RUN npm ci
 
-# Copy frontend source code
-COPY frontend/ ./
+# Copy source code
+COPY . ./
 
 # Build the frontend (outputs to ../static, but we're in /app so it goes to /static)
 # Override outDir to keep it in the container context
@@ -31,14 +31,14 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Copy frontend-server package files
-COPY frontend-server/package*.json ./
+# Copy server package files
+COPY server/package*.json ./
 
 # Install only production dependencies
 RUN npm ci --only=production
 
 # Copy the server code
-COPY frontend-server/server.js ./
+COPY server/server.js ./
 
 # Copy built frontend assets from stage 1
 COPY --from=frontend-build /app/dist ./static

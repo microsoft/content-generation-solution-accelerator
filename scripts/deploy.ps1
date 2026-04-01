@@ -131,14 +131,15 @@ if ($continue -eq "y" -or $continue -eq "Y") {
     Write-Host "Step 3: Building and deploying frontend..." -ForegroundColor Green
     Write-Host "==========================================" -ForegroundColor Green
     
-    Set-Location "$ProjectDir\src\frontend"
+    Set-Location "$ProjectDir\src\app"
     npm install
     npm run build
     
     # Copy built files to server directory
-    Copy-Item -Path "$ProjectDir\src\static\*" -Destination "$ProjectDir\src\frontend-server\static\" -Recurse -Force
+    New-Item -ItemType Directory -Force "$ProjectDir\src\app\server\static" | Out-Null
+    Copy-Item -Path "$ProjectDir\src\app\static\*" -Destination "$ProjectDir\src\app\server\static\" -Recurse -Force
     
-    Set-Location "$ProjectDir\src\frontend-server"
+    Set-Location "$ProjectDir\src\app\server"
     
     # Create deployment package
     if (Test-Path "frontend-deploy.zip") {

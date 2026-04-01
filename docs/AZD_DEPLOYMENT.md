@@ -251,7 +251,7 @@ Error: az webapp deploy failed
 
 **Solution**: Ensure the frontend builds successfully:
 ```bash
-cd src/app/frontend
+cd src/app
 npm install
 npm run build
 ```
