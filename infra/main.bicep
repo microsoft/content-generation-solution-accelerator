@@ -107,8 +107,18 @@ param existingLogAnalyticsWorkspaceId string = ''
 @description('Optional. Resource ID of an existing Foundry project.')
 param azureExistingAIProjectResourceId string = ''
 
-@description('Optional. Deploy Azure Bastion and Jumpbox VM for private network administration.')
+@description('Optional. Deploy Azure Bastion and Jumpbox resources for private network administration.')
 param deployBastionAndJumpbox bool = false
+
+@description('Optional. Jumpbox VM size. Must support accelerated networking and Premium SSD.')
+param vmSize string = ''
+
+@description('Optional. Jumpbox VM admin username.')
+param vmAdminUsername string = ''
+
+@description('Optional. Jumpbox VM admin password.')
+@secure()
+param vmAdminPassword string = ''
 
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags object = {}
@@ -367,17 +377,111 @@ module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-id
 }
 
 // ========== Virtual Network and Networking Components ========== //
+var deployAdminAccessResources = enablePrivateNetworking && deployBastionAndJumpbox && !empty(vmAdminPassword)
 module virtualNetwork 'modules/virtualNetwork.bicep' = if (enablePrivateNetworking) {
   name: take('module.virtualNetwork.${solutionSuffix}', 64)
   params: {
     vnetName: 'vnet-${solutionSuffix}'
-    vnetLocation: solutionLocation
-    vnetAddressPrefixes: ['10.0.0.0/20']
+    addressPrefixes: ['10.0.0.0/20'] // 4096 addresses (enough for 8 /23 subnets or 16 /24)
+    location: solutionLocation
+    deployBastionAndJumpbox: deployAdminAccessResources
     tags: tags
     logAnalyticsWorkspaceId: logAnalyticsWorkspaceResourceId
-    enableTelemetry: enableTelemetry
     resourceSuffix: solutionSuffix
-    deployBastionAndJumpbox: deployBastionAndJumpbox
+    enableTelemetry: enableTelemetry
+  }
+}
+
+// Azure Bastion Host
+var bastionHostName = 'bas-${solutionSuffix}'
+var zoneSupportedJumpboxLocations = [
+  'australiaeast'
+  'centralus'
+  'eastus'
+  'eastus2'
+  'japaneast'
+  'northeurope'
+  'southeastasia'
+  'swedencentral'
+  'uksouth'
+  'westus3'
+]
+module bastionHost 'br/public:avm/res/network/bastion-host:0.8.2' = if (deployAdminAccessResources) {
+  name: take('avm.res.network.bastion-host.${bastionHostName}', 64)
+  params: {
+    name: bastionHostName
+    skuName: 'Standard'
+    location: solutionLocation
+    virtualNetworkResourceId: virtualNetwork!.outputs.resourceId
+    diagnosticSettings: !empty(logAnalyticsWorkspaceResourceId)
+      ? [
+          {
+            name: 'bastionDiagnostics'
+            workspaceResourceId: logAnalyticsWorkspaceResourceId
+            logCategoriesAndGroups: [
+              {
+                categoryGroup: 'allLogs'
+                enabled: true
+              }
+            ]
+          }
+        ]
+      : []
+    tags: tags
+    enableTelemetry: enableTelemetry
+    publicIPAddressObject: {
+      name: 'pip-${bastionHostName}'
+    }
+  }
+}
+
+// Jumpbox Virtual Machine
+var jumpboxUniqueToken = take(uniqueString(resourceGroup().id, solutionSuffix), 10)
+var jumpboxVmName = take('vm-${jumpboxUniqueToken}', 15)
+module jumpboxVM 'br/public:avm/res/compute/virtual-machine:0.21.0' = if (deployAdminAccessResources) {
+  name: take('avm.res.compute.virtual-machine.${jumpboxVmName}', 64)
+  params: {
+    name: take(jumpboxVmName, 15)
+    enableTelemetry: enableTelemetry
+    computerName: take(jumpboxVmName, 15)
+    osType: 'Windows'
+    vmSize: empty(vmSize) ? 'Standard_D2s_v5' : vmSize
+    adminUsername: empty(vmAdminUsername) ? 'JumpboxAdminUser' : vmAdminUsername
+    adminPassword: vmAdminPassword
+    managedIdentities: {
+      userAssignedResourceIds: [
+        userAssignedIdentity.outputs.resourceId
+      ]
+    }
+    availabilityZone: contains(zoneSupportedJumpboxLocations, solutionLocation) ? 1 : -1
+    imageReference: {
+      publisher: 'microsoft-dsvm'
+      offer: 'dsvm-win-2022'
+      sku: 'winserver-2022'
+      version: 'latest'
+    }
+    nicConfigurations: [
+      {
+        name: 'nic-${jumpboxVmName}'
+        enableAcceleratedNetworking: true
+        ipConfigurations: [
+          {
+            name: 'ipconfig01'
+            subnetResourceId: virtualNetwork!.outputs.jumpboxSubnetResourceId
+          }
+        ]
+      }
+    ]
+    osDisk: {
+      caching: 'ReadWrite'
+      diskSizeGB: 128
+      managedDisk: {
+        storageAccountType: 'Premium_LRS'
+      }
+    }
+    encryptionAtHost: false // Some Azure subscriptions do not support encryption at host
+    location: solutionLocation
+    tags: tags
   }
   dependsOn: (enableMonitoring && !useExistingLogAnalytics) ? [logAnalyticsWorkspace] : []
 }

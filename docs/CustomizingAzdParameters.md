@@ -18,9 +18,17 @@ By default this template will use the environment name as the prefix to prevent 
 | `AZURE_OPENAI_IMAGE_MODEL`             | string  | `gpt-image-1-mini`         | Image model to deploy (allowed: `gpt-image-1-mini`, `gpt-image-1.5`, `none`). |
 | `IMAGE_MODEL_CAPACITY`                 | integer | `1`                        | Sets the image model deployment capacity in RPM (minimum: `1`).               |
 | `AZURE_OPENAI_API_VERSION`             | string  | `2025-01-01-preview`       | Specifies the API version for Azure OpenAI service.                           |
-| `AZURE_ENV_OPENAI_LOCATION`           | string  | `<User selects during deployment>` | Sets the Azure region for OpenAI resource deployment.                         |
+| `AZURE_ENV_OPENAI_LOCATION`           | string  | `<User selects during deployment>` | Sets the Azure region for OpenAI resource deployment. Allowed: `australiaeast`, `canadaeast`, `eastus2`, `japaneast`, `koreacentral`, `polandcentral`, `swedencentral`, `switzerlandnorth`, `uaenorth`, `uksouth`, `westus3`. |
 | `AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID` | string  | `""`                       | Reuses an existing Log Analytics Workspace instead of creating a new one.     |
 | `AZURE_EXISTING_AI_PROJECT_RESOURCE_ID`| string  | `""`                       | Reuses an existing AI Foundry Project instead of creating a new one.          |
+| `enableMonitoring`                     | boolean | `false`                    | Enable Log Analytics and Application Insights (WAF-aligned).                  |
+| `enableScalability`                    | boolean | `false`                    | Enable auto-scaling and higher SKUs (WAF-aligned).                            |
+| `enableRedundancy`                     | boolean | `false`                    | Enable zone redundancy and geo-replication (WAF-aligned).                     |
+| `enablePrivateNetworking`              | boolean | `false`                    | Enable VNet integration and private endpoints (WAF-aligned).                  |
+| `deployBastionAndJumpbox`              | boolean | `false`                    | Deploy Azure Bastion and jumpbox admin-path resources when private networking is enabled. |
+| `AZURE_ENV_VM_SIZE`                    | string  | `""`                       | Overrides the jumpbox VM size (private networking only). Must support accelerated networking and Premium SSD. |
+| `AZURE_ENV_VM_ADMIN_USERNAME`          | string  | `""`                       | Sets the jumpbox VM admin username (private networking only).                 |
+| `AZURE_ENV_VM_ADMIN_PASSWORD`          | string  | `""`                       | Sets the jumpbox VM admin password. Bastion and jumpbox resources are deployed only when this is set and `deployBastionAndJumpbox=true`. |
 | `ACR_NAME`                             | string  | `contentgencontainerreg`   | Sets the existing Azure Container Registry name (without `.azurecr.io`).      |
 | `IMAGE_TAG`                            | string  | `latest`                   | Sets the container image tag (e.g., `latest`, `dev`, `hotfix`).               |
 
