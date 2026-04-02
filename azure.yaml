@@ -153,8 +153,7 @@ hooks:
         echo "Registry: $ACR_NAME"
         echo "Image: $BACKEND_IMAGE:latest"
         
-        az acr login --name "$ACR_NAME" 2>/dev/null
-        if az acr build --registry "$ACR_NAME" --image "$BACKEND_IMAGE:latest" --file ./src/backend/ApiApp.Dockerfile ./src/backend; then
+        if az acr build --registry "$ACR_NAME" --image "$BACKEND_IMAGE:latest" --file ./src/backend/ApiApp.Dockerfile ./src/backend --no-logs; then
           echo "Container image built and pushed successfully!"
         else
           echo "Failed to build container image"
