@@ -65,7 +65,7 @@ export function WelcomeCard({ onSuggestionClick, currentInput = '' }: WelcomeCar
               fontSize: 'clamp(16px, 2.5vw, 20px)',
             }}
           >
-            Welcome to your Content Generation Accelerator
+            [Local]Welcome to your Content Generation Accelerator
           </Text>
           <Text 
             size={300} 
@@ -76,7 +76,7 @@ export function WelcomeCard({ onSuggestionClick, currentInput = '' }: WelcomeCar
               fontSize: 'clamp(13px, 2vw, 15px)',
             }}
           >
-            Here are the options I can assist you with today
+            [v2.0 - Local Deployment Test] Here are the options I can assist you with today
           </Text>
         </div>
         

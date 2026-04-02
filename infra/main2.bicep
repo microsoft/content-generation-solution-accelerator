@@ -10,7 +10,6 @@ metadata description = '''Solution Accelerator for multimodal marketing content 
 @description('Optional. A unique application/solution name for all resources in this deployment.')
 param solutionName string = 'contentgen'
 
-@minLength(3)
 @maxLength(5)
 @description('Optional. A unique text value for the solution.')
 param solutionUniqueText string = substring(uniqueString(subscription().id, resourceGroup().name, solutionName), 0, 5)
@@ -129,17 +128,14 @@ param enableRedundancy bool = false
 @description('Optional. Enable private networking for applicable resources (WAF-aligned).')
 param enablePrivateNetworking bool = false
 
+@description('Optional. The existing Container Registry name (without .azurecr.io). Must contain pre-built images: content-gen-app and content-gen-api.')
+param acrName string = 'contentgencontainerreg'
+
+@description('Optional. Image Tag.')
+param imageTag string = 'latest'
+
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
-
-@description('Optional. Frontend image name (without tag).')
-param frontendImageName string = 'content-gen-app'
-
-@description('Optional. Backend image name (without tag).')
-param backendImageName string = 'content-gen-api'
-
-@description('Optional. Image tag for container deployment. Leave empty to skip ACI deployment.')
-param imageTag string
 
 @description('Optional. Created by user name.')
 param createdBy string = contains(deployer(), 'userPrincipalName')? split(deployer().userPrincipalName, '@')[0]: deployer().objectId
@@ -150,6 +146,8 @@ param createdBy string = contains(deployer(), 'userPrincipalName')? split(deploy
 
 var solutionLocation = empty(location) ? resourceGroup().location : location
 
+// acrName is required - points to existing ACR with pre-built images
+var acrResourceName = acrName
 var solutionSuffix = toLower(trim(replace(
   replace(
     replace(replace(replace(replace('${solutionName}${solutionUniqueText}', '-', ''), '_', ''), '.', ''), '/', ''),
@@ -159,8 +157,6 @@ var solutionSuffix = toLower(trim(replace(
   '*',
   ''
 )))
-
-var acrResourceName = 'cr${solutionSuffix}'
 
 var cosmosDbZoneRedundantHaRegionPairs = {
   australiaeast: 'uksouth'
@@ -367,23 +363,6 @@ module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-id
     location: solutionLocation
     tags: tags
     enableTelemetry: enableTelemetry
-  }
-}
-
-// ========== Azure Container Registry ========== //
-// CUSTOM DEPLOYMENT: ACR for remote Docker builds (AZD pushes images here)
-module containerRegistry 'br/public:avm/res/container-registry/registry:0.9.0' = {
-  name: take('avm.res.container-registry.registry.${acrResourceName}', 64)
-  params: {
-    name: acrResourceName
-    location: solutionLocation
-    tags: tags
-    enableTelemetry: enableTelemetry
-    acrSku: 'Standard'
-    acrAdminUserEnabled: false
-    anonymousPullEnabled: true  // Allows ACI to pull images without credentials
-    publicNetworkAccess: 'Enabled'
-    networkRuleBypassOptions: 'AzureServices'
   }
 }
 
@@ -842,30 +821,28 @@ module webSite 'modules/web-sites.bicep' = {
   name: take('module.web-sites.${webSiteResourceName}', 64)
   params: {
     name: webSiteResourceName
-    tags: union(tags, { 'azd-service-name': 'frontend' })
+    tags: tags
     location: solutionLocation
-    kind: 'app,linux'
+    kind: 'app,linux,container'
     serverFarmResourceId: webServerFarm.outputs.resourceId
     managedIdentities: { userAssignedResourceIds: [userAssignedIdentity!.outputs.resourceId] }
     siteConfig: {
-      // Node.js runtime for frontend server (code deployment via AZD)
-      linuxFxVersion: 'NODE|22-lts'
+      // Frontend container - same for both modes
+      linuxFxVersion: 'DOCKER|${acrResourceName}.azurecr.io/content-gen-app:${imageTag}'
       minTlsVersion: '1.2'
       alwaysOn: true
       ftpsState: 'FtpsOnly'
-      appCommandLine: 'node server.js'
     }
     virtualNetworkSubnetId: enablePrivateNetworking ? virtualNetwork!.outputs.webSubnetResourceId : null
     configs: concat(
       [
         {
-          // Frontend server proxies to ACI backend
+          // Frontend container proxies to ACI backend (both modes)
           name: 'appsettings'
           properties: {
-            WEBSITES_PORT: '8080'
+            DOCKER_REGISTRY_SERVER_URL: 'https://${acrResourceName}.azurecr.io'
             BACKEND_URL: aciBackendUrl
             AZURE_CLIENT_ID: userAssignedIdentity.outputs.clientId
-            SCM_DO_BUILD_DURING_DEPLOYMENT: 'true' // Run npm install during deployment
           }
           applicationInsightResourceId: enableMonitoring ? applicationInsights!.outputs.resourceId : null
         }
@@ -889,18 +866,14 @@ module webSite 'modules/web-sites.bicep' = {
 }
 
 // ========== Container Instance (Backend API) ========== //
-// CUSTOM DEPLOYMENT: ACI is skipped when imageTag='none' (first run), deployed after images are built
 var containerInstanceName = 'aci-${solutionSuffix}'
-var backendImageUrl = '${containerRegistry.outputs.loginServer}/${backendImageName}:${imageTag}'
-// Deploy ACI only when imageTag is set to a real tag (not 'none')
-var shouldDeployACI = !empty(imageTag) && imageTag != 'none'
-module containerInstance 'modules/container-instance.bicep' = if (shouldDeployACI) {
+module containerInstance 'modules/container-instance.bicep' = {
   name: take('module.container-instance.${containerInstanceName}', 64)
   params: {
     name: containerInstanceName
     location: solutionLocation
     tags: tags
-    containerImage: backendImageUrl
+    containerImage: '${acrResourceName}.azurecr.io/content-gen-api:${imageTag}'
     cpu: 2
     memoryInGB: 4
     port: 8000
@@ -1037,22 +1010,16 @@ output AZURE_APPLICATION_INSIGHTS_CONNECTION_STRING string = (enableMonitoring &
 output AZURE_ENV_OPENAI_LOCATION string = azureAiServiceLocation
 
 @description('Contains Container Instance Name')
-output CONTAINER_INSTANCE_NAME string = shouldDeployACI ? containerInstance!.outputs.name : ''
+output CONTAINER_INSTANCE_NAME string = containerInstance.outputs.name
 
 @description('Contains Container Instance IP Address')
-output CONTAINER_INSTANCE_IP string = shouldDeployACI ? containerInstance!.outputs.ipAddress : ''
+output CONTAINER_INSTANCE_IP string = containerInstance.outputs.ipAddress
 
 @description('Contains Container Instance FQDN (only for non-private networking)')
-output CONTAINER_INSTANCE_FQDN string = (shouldDeployACI && !enablePrivateNetworking) ? containerInstance!.outputs.fqdn : ''
+output CONTAINER_INSTANCE_FQDN string = enablePrivateNetworking ? '' : containerInstance.outputs.fqdn
 
 @description('Contains ACR Name')
 output ACR_NAME string = acrResourceName
-
-@description('Contains Azure Container Registry Endpoint (used by AZD for remote builds)')
-output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.loginServer
-
-@description('Contains Azure Container Registry Name')
-output AZURE_CONTAINER_REGISTRY_NAME string = containerRegistry.outputs.name
 
 @description('Contains flag for Azure AI Foundry usage')
 output USE_FOUNDRY bool = useFoundryMode ? true : false
@@ -1065,15 +1032,3 @@ output AZURE_AI_MODEL_DEPLOYMENT_NAME string = gptModelName
 
 @description('Contains Azure AI Image Model Deployment Name (empty if none selected)')
 output AZURE_AI_IMAGE_MODEL_DEPLOYMENT string = imageModelConfig[imageModelChoice].name
-
-@description('Contains Managed Identity Client ID')
-output AZURE_CLIENT_ID string = userAssignedIdentity.outputs.clientId
-
-@description('Frontend image name')
-output FRONTEND_IMAGE_NAME string = frontendImageName
-
-@description('Backend image name')
-output BACKEND_IMAGE_NAME string = backendImageName
-
-@description('Image tag')
-output IMAGE_TAG string = imageTag
