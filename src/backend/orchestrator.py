@@ -15,7 +15,6 @@ Workflow:
 Agents can hand off to each other dynamically based on context.
 """
 
-import base64
 import json
 import logging
 import re
@@ -23,7 +22,6 @@ from typing import AsyncIterator, Optional, cast
 
 from agent_framework import (
     Message,
-    WorkflowEvent,
 )
 from agent_framework.orchestrations import HandoffBuilder, HandoffAgentUserRequest
 from agent_framework.azure import AzureOpenAIResponsesClient, AzureAIProjectAgentProvider
