@@ -1,0 +1,49 @@
+version: 2
+
+updates:
+  # GitHub Actions - grouped
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    target-branch: "dependabotchanges"
+    commit-message:
+      prefix: "build"
+    open-pull-requests-limit: 10
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # Python (pip) dependencies - grouped
+  - package-ecosystem: "pip"
+    directories:
+      - "/src/backend"
+      - "/infra/vscode_web"
+      - "/scripts"
+    schedule:
+      interval: "monthly"
+    target-branch: "dependabotchanges"
+    commit-message:
+      prefix: "build"
+    open-pull-requests-limit: 10
+    groups:
+      python-deps:
+        patterns:
+          - "*"
+
+  # npm dependencies - grouped
+  - package-ecosystem: "npm"
+    directories:
+      - "/src/app/frontend"
+      - "/src/app/frontend-server"
+    schedule:
+      interval: "monthly"
+    target-branch: "dependabotchanges"
+    commit-message:
+      prefix: "build"
+    open-pull-requests-limit: 10
+    groups:
+      npm-deps:
+        patterns:
+          - "*"

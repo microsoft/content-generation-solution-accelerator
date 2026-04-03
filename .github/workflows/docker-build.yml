@@ -7,9 +7,9 @@ on:
       - dev
       - demo
     paths:
-      - 'content-gen/src/backend/**'
-      - 'content-gen/src/app/frontend/**'
-      - 'content-gen/src/app/frontend-server/**'
+      - 'src/backend/**'
+      - 'src/app/frontend/**'
+      - 'src/app/frontend-server/**'
       - '.github/workflows/docker-build.yml'
   pull_request:
     types:
@@ -22,18 +22,20 @@ on:
       - dev
       - demo
     paths:
-      - 'content-gen/src/backend/**'
-      - 'content-gen/src/app/frontend/**'
-      - 'content-gen/src/app/frontend-server/**'
+      - 'src/backend/**'
+      - 'src/app/frontend/**'
+      - 'src/app/frontend-server/**'
       - '.github/workflows/docker-build.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
   actions: read
+  id-token: write  # Required for OIDC-based Azure authentication
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
       - name: Checkout repository
@@ -42,13 +44,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Login to Azure (OIDC)
+        if: ${{ (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo')) || (github.event_name == 'workflow_dispatch' && (github.ref_name == 'dependabotchanges'||github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo')) }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - name: Log in to Azure Container Registry
         if: ${{ (github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo')) || (github.event_name == 'workflow_dispatch' && (github.ref_name == 'dependabotchanges'||github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo')) }}
-        uses: azure/docker-login@v2 
-        with:
-          login-server: ${{ secrets.ACR_LOGIN_SERVER }}
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+        shell: bash
+        run: az acr login --name ${{ secrets.ACR_LOGIN_SERVER }}
 
       - name: Get current date
         id: date
@@ -76,8 +83,8 @@ jobs:
       - name: Build and Push Docker Image for Frontend Server
         uses: docker/build-push-action@v6
         with:
-          context: ./content-gen/src/app
-          file: ./content-gen/src/app/WebApp.Dockerfile
+          context: ./src/app
+          file: ./src/app/WebApp.Dockerfile
           push: ${{ github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo'  || github.ref_name == 'dependabotchanges'  }}
           tags: |
             ${{ secrets.ACR_LOGIN_SERVER || 'acrlogin.azurecr.io' }}/content-gen-app:${{ steps.determine_tag.outputs.tagname }}
@@ -86,8 +93,8 @@ jobs:
       - name: Build and Push Docker Image for Backend Server
         uses: docker/build-push-action@v6
         with:
-          context: ./content-gen/src/backend
-          file: ./content-gen/src/backend/ApiApp.Dockerfile
+          context: ./src/backend
+          file: ./src/backend/ApiApp.Dockerfile
           push: ${{ github.ref_name == 'main' || github.ref_name == 'dev' || github.ref_name == 'demo'  || github.ref_name == 'dependabotchanges' }}
           tags: |
             ${{ secrets.ACR_LOGIN_SERVER || 'acrlogin.azurecr.io' }}/content-gen-api:${{ steps.determine_tag.outputs.tagname }}

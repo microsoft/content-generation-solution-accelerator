@@ -24,29 +24,29 @@ env:
     url: ${{ inputs.DOCGEN_URL }}
     accelerator_name: "DocGen"
     test_suite: ${{ inputs.TEST_SUITE }}
-permissions:
-  contents: read
-  actions: read
-  
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    environment: production
     outputs:
       TEST_SUCCESS: ${{ steps.test1.outcome == 'success' || steps.test2.outcome == 'success' || steps.test3.outcome == 'success' }}
       TEST_REPORT_URL: ${{ steps.upload_report.outputs.artifact-url }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.13'
 
-      - name: Login to Azure
-        run: |
-          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Login to Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Install dependencies
         run: |
@@ -94,7 +94,7 @@ jobs:
         id: test1
         run: |
           if [ "${{ env.test_suite }}" == "GoldenPath-Testing" ]; then
-            xvfb-run pytest -m goldenpath --html=report/report.html --self-contained-html
+            xvfb-run pytest -m gp --html=report/report.html --self-contained-html
           else
             xvfb-run pytest --html=report/report.html --self-contained-html
           fi
@@ -111,7 +111,7 @@ jobs:
         if: ${{ steps.test1.outcome == 'failure' }}
         run: |
           if [ "${{ env.test_suite }}" == "GoldenPath-Testing" ]; then
-            xvfb-run pytest -m goldenpath --html=report/report.html --self-contained-html
+            xvfb-run pytest -m gp --html=report/report.html --self-contained-html
           else
             xvfb-run pytest --html=report/report.html --self-contained-html
           fi
@@ -128,7 +128,7 @@ jobs:
         if: ${{ steps.test2.outcome == 'failure' }}
         run: |
           if [ "${{ env.test_suite }}" == "GoldenPath-Testing" ]; then
-            xvfb-run pytest -m goldenpath --html=report/report.html --self-contained-html
+            xvfb-run pytest -m gp --html=report/report.html --self-contained-html
           else
             xvfb-run pytest --html=report/report.html --self-contained-html
           fi
@@ -136,12 +136,13 @@ jobs:
 
       - name: Upload test report
         id: upload_report
-        uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v6
+        if: always()
         with:
           name: test-report
           path: | 
             tests/e2e-test/report/*
+            tests/e2e-test/tests/screenshots/*
             tests/e2e-test/screenshots/*
 
       - name: Generate E2E Test Summary

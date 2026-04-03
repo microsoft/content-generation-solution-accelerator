@@ -1,0 +1,8 @@
+# Dependencies needed to run scripts/post_deploy.py locally
+#
+# Installs the core application dependencies first, then adds post-deploy-only deps.
+
+-r ../src/backend/requirements.txt
+
+# Post-deploy script deps
+httpx>=0.28.0

@@ -41,6 +41,8 @@ The sample data includes synthetic product catalogs and brand guidelines. The da
 
 <br/>
 
+## Features
+
 ### Key features
 <details open>
   <summary>Click to learn more about the key features this solution enables</summary>
@@ -49,7 +51,7 @@ The sample data includes synthetic product catalogs and brand guidelines. The da
   Parse free-text creative briefs into structured fields (overview, objectives, target audience, key message, tone/style, deliverable, timelines, visual guidelines, CTA).
 
   - **Multimodal Content Generation** <br/>
-  Generate marketing copy and images using GPT models and DALL-E 3 grounded in enterprise product data.
+  Generate marketing copy and images using GPT models grounded in enterprise product data.
 
   - **Brand Compliance Validation** <br/>
   Validate all generated content against brand guidelines with severity-categorized feedback (Error, Warning, Info).
@@ -60,6 +62,9 @@ The sample data includes synthetic product catalogs and brand guidelines. The da
 </details>
 
 <br /><br />
+
+## Getting Started
+
 <h2><img src="./docs/images/readme/quick_deploy.png" width="48" />
 Quick deploy
 </h2>
@@ -69,10 +74,10 @@ Follow the quick deploy steps on the deployment guide to deploy this solution to
 
 > **Note:** This solution accelerator requires **Azure Developer CLI (azd) version 1.18.0 or higher**. Please ensure you have the latest version installed before proceeding with deployment. [Download azd here](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd).
 
-[Click here to launch the deployment guide](./content-gen/docs/DEPLOYMENT.md)
+[Click here to launch the deployment guide](./docs/DEPLOYMENT.md)
 <br/><br/>
 
-| [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/microsoft/content-generation-solution-accelerator) | [![Open in Dev Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/microsoft/content-generation-solution-accelerator) | [![Open in Visual Studio Code Web](https://img.shields.io/static/v1?style=for-the-badge&label=Visual%20Studio%20Code%20(Web)&message=Open&color=blue&logo=visualstudiocode&logoColor=white)](https://vscode.dev/azure/?vscode-azure-exp=foundry&agentPayload=eyJiYXNlVXJsIjogImh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS9taWNyb3NvZnQvY29udGVudC1nZW5lcmF0aW9uLXNvbHV0aW9uLWFjY2VsZXJhdG9yL3JlZnMvaGVhZHMvbWFpbi9jb250ZW50LWdlbi9pbmZyYS92c2NvZGVfd2ViIiwgImluZGV4VXJsIjogIi9pbmRleC5qc29uIiwgInZhcmlhYmxlcyI6IHsiYWdlbnRJZCI6ICIiLCAiY29ubmVjdGlvblN0cmluZyI6ICIiLCAidGhyZWFkSWQiOiAiIiwgInVzZXJNZXNzYWdlIjogIiIsICJwbGF5Z3JvdW5kTmFtZSI6ICIiLCAibG9jYXRpb24iOiAiIiwgInN1YnNjcmlwdGlvbklkIjogIiIsICJyZXNvdXJjZUlkIjogIiIsICJwcm9qZWN0UmVzb3VyY2VJZCI6ICIiLCAiZW5kcG9pbnQiOiAiIn0sICJjb2RlUm91dGUiOiBbImFpLXByb2plY3RzLXNkayIsICJweXRob24iLCAiZGVmYXVsdC1henVyZS1hdXRoIiwgImVuZHBvaW50Il19) |
+| [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/microsoft/content-generation-solution-accelerator) | [![Open in Dev Containers](https://img.shields.io/static/v1?style=for-the-badge&label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/microsoft/content-generation-solution-accelerator) | [![Open in Visual Studio Code Web](https://img.shields.io/static/v1?style=for-the-badge&label=Visual%20Studio%20Code%20(Web)&message=Open&color=blue&logo=visualstudiocode&logoColor=white)](https://vscode.dev/azure/?vscode-azure-exp=foundry&agentPayload=eyJiYXNlVXJsIjogImh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS9taWNyb3NvZnQvY29udGVudC1nZW5lcmF0aW9uLXNvbHV0aW9uLWFjY2VsZXJhdG9yL3JlZnMvaGVhZHMvbWFpbi9pbmZyYS92c2NvZGVfd2ViIiwgImluZGV4VXJsIjogIi9pbmRleC5qc29uIiwgInZhcmlhYmxlcyI6IHsiYWdlbnRJZCI6ICIiLCAiY29ubmVjdGlvblN0cmluZyI6ICIiLCAidGhyZWFkSWQiOiAiIiwgInVzZXJNZXNzYWdlIjogIiIsICJwbGF5Z3JvdW5kTmFtZSI6ICIiLCAibG9jYXRpb24iOiAiIiwgInN1YnNjcmlwdGlvbklkIjogIiIsICJyZXNvdXJjZUlkIjogIiIsICJwcm9qZWN0UmVzb3VyY2VJZCI6ICIiLCAiZW5kcG9pbnQiOiAiIn0sICJjb2RlUm91dGUiOiBbImFpLXByb2plY3RzLXNkayIsICJweXRob24iLCAiZGVmYXVsdC1henVyZS1hdXRoIiwgImVuZHBvaW50Il19) |
 |---|---|---|
 
 <br/>
@@ -81,6 +86,8 @@ Follow the quick deploy steps on the deployment guide to deploy this solution to
  <br/>To ensure sufficient quota is available in your subscription, please follow [quota check instructions guide](./docs/QuotaCheck.md) before you deploy the solution.
 
 <br/>
+
+## Guidance
 
 ### Prerequisites and costs
 
@@ -98,11 +105,13 @@ _Note: This is not meant to outline all costs as selected SKUs, scaled use, cust
 
 <br/>
 
+## Resources
+
 | Product | Description | Cost |
 |---|---|---|
 | [Azure AI Foundry](https://learn.microsoft.com/en-us/azure/ai-foundry/) | Free tier. Build generative AI applications on an enterprise-grade platform. | [Pricing](https://azure.microsoft.com/pricing/details/ai-studio/) |
 | [Azure Storage Account](https://learn.microsoft.com/en-us/azure/storage/blobs/) | Standard tier, LRS. Pricing is based on storage and operations. Blob storage for product images and generated content. | [Pricing](https://azure.microsoft.com/pricing/details/storage/blobs/) |
-| [Azure AI Services](https://learn.microsoft.com/en-us/azure/ai-services/) | S0 tier, defaults to gpt-5.1 (GPT) and gpt-image-1 (DALL-E 3) models. Pricing is based on token count. | [Pricing](https://azure.microsoft.com/pricing/details/cognitive-services/) |
+| [Azure AI Services](https://learn.microsoft.com/en-us/azure/ai-services/) | S0 tier, defaults to gpt-5.1 (GPT) and gpt-image-1-mini models. Pricing is based on token count. | [Pricing](https://azure.microsoft.com/pricing/details/cognitive-services/) |
 | [Azure Container Instance](https://learn.microsoft.com/en-us/azure/container-instances/) | Backend API hosting with private VNet integration. Pricing is based on resource allocation. | [Pricing](https://azure.microsoft.com/pricing/details/container-instances/) |
 | [Azure App Service](https://learn.microsoft.com/en-us/azure/app-service/) | B1 tier. Frontend hosting with Node.js proxy server. | [Pricing](https://azure.microsoft.com/pricing/details/app-service/) |
 | [Azure Container Registry](https://learn.microsoft.com/en-us/azure/container-registry/) | Basic tier. Build, store, and manage container images and artifacts in a private registry for all types of container deployments | [Pricing](https://azure.microsoft.com/pricing/details/container-registry/) |
@@ -140,7 +149,7 @@ Accelerate your marketing content creation by leveraging AI to interpret creativ
   Parse unstructured creative briefs into structured fields automatically, ensuring all campaign requirements are captured.
 
   - **Generate multimodal content** <br/>
-  Create marketing copy and images that align with your brand voice and product catalog using GPT and DALL-E 3.
+  Create marketing copy and images that align with your brand voice and product catalog using GPT models (text and image generation models).
 
   - **Ensure brand compliance** <br/>
   Validate all generated content against brand guidelines with severity-categorized feedback before publication.
@@ -159,6 +168,10 @@ Accelerate your marketing content creation by leveraging AI to interpret creativ
 <h2><img src="./docs/images/readme/supporting_documentation.png" width="48" />
 Supporting documentation
 </h2>
+
+### Technical guide
+
+For comprehensive technical documentation including architecture, agent orchestration, configuration, and development setup, see the [Technical Guide](./docs/TECHNICAL_GUIDE.md).
 
 ### Security guidelines
 
@@ -187,6 +200,15 @@ Check out similar solution accelerators
 
 <br/>   
 
+💡 Want to get familiar with Microsoft's AI and Data Engineering best practices? Check out our playbooks to learn more
+
+| Playbook | Description |
+|:---|:---|
+| [AI&nbsp;playbook](https://learn.microsoft.com/en-us/ai/playbook/) | The Artificial Intelligence (AI) Playbook provides enterprise software engineers with solutions, capabilities, and code developed to solve real-world AI problems. |
+| [Data&nbsp;playbook](https://learn.microsoft.com/en-us/data-engineering/playbook/understanding-data-playbook) | The data playbook provides enterprise software engineers with solutions which contain code developed to solve real-world problems. Everything in the playbook is developed with, and validated by, some of Microsoft's largest and most influential customers and partners. |
+
+<br/> 
+
 
 ## Provide feedback
 
@@ -195,7 +217,7 @@ Have questions, find a bug, or want to request a feature? [Submit a new issue](h
 <br/>
 
 ## Responsible AI Transparency FAQ 
-Please refer to [Transparency FAQ](./content-gen/docs/TRANSPARENCY_FAQ.md) for responsible AI transparency details of this solution accelerator.
+Please refer to [Transparency FAQ](./docs/TRANSPARENCY_FAQ.md) for responsible AI transparency details of this solution accelerator.
 
 <br/>
 

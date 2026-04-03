@@ -66,6 +66,11 @@ on:
         required: false
         default: ''
         type: string
+      image_model_choice:
+        description: 'Image model to deploy (gpt-image-1-mini, gpt-image-1.5, none)'
+        required: false
+        default: 'gpt-image-1-mini'
+        type: string
     outputs:
       RESOURCE_GROUP_NAME:
         description: "Resource Group Name"
@@ -91,22 +96,20 @@ on:
 
 env:
   GPT_MIN_CAPACITY: 150
-  TEXT_EMBEDDING_MIN_CAPACITY: 80
+  IMAGE_MODEL_MIN_CAPACITY: 1
   BRANCH_NAME: ${{ github.event.workflow_run.head_branch || github.head_ref || github.ref_name }}
   WAF_ENABLED: ${{ inputs.trigger_type == 'workflow_dispatch' && (inputs.waf_enabled || false) || false }}
   EXP: ${{ inputs.trigger_type == 'workflow_dispatch' && (inputs.EXP || false) || false }}
   CLEANUP_RESOURCES: ${{ inputs.trigger_type != 'workflow_dispatch' || inputs.cleanup_resources }}
   RUN_E2E_TESTS: ${{ inputs.trigger_type == 'workflow_dispatch' && (inputs.run_e2e_tests || 'GoldenPath-Testing') || 'GoldenPath-Testing' }}
   BUILD_DOCKER_IMAGE: ${{ inputs.trigger_type == 'workflow_dispatch' && (inputs.build_docker_image || false) || false }}
-permissions:
-  contents: read
-  actions: read
-  
+
 jobs:
   azure-setup:
     name: Azure Setup
     if: inputs.trigger_type != 'workflow_dispatch' || inputs.existing_webapp_url == '' || inputs.existing_webapp_url == null
     runs-on: ubuntu-latest
+    environment: production
     outputs:
       RESOURCE_GROUP_NAME: ${{ steps.check_create_rg.outputs.RESOURCE_GROUP_NAME }}
       ENV_NAME: ${{ steps.generate_env_name.outputs.ENV_NAME }}
@@ -317,32 +320,33 @@ jobs:
           
           
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Login to Azure
-        shell: bash
-        run: |
-          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Login to Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       
       - name: Run Quota Check
         id: quota-check
         env:
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           GPT_MIN_CAPACITY: ${{ env.GPT_MIN_CAPACITY }}
-          TEXT_EMBEDDING_MIN_CAPACITY: ${{ env.TEXT_EMBEDDING_MIN_CAPACITY }}
+          IMAGE_MODEL_CHOICE: ${{ inputs.image_model_choice || 'gpt-image-1-mini' }}
+          IMAGE_MODEL_MIN_CAPACITY: ${{ env.IMAGE_MODEL_MIN_CAPACITY }}
           AZURE_REGIONS: ${{ vars.AZURE_REGIONS }}
         run: |
           chmod +x scripts/checkquota.sh
-          if ! scripts/checkquota.sh; then
+          QUOTA_OUTPUT="$(scripts/checkquota.sh 2>&1)"; QUOTA_STATUS=$?
+          echo "$QUOTA_OUTPUT"
+          if [ "$QUOTA_STATUS" -ne 0 ]; then
             # If quota check fails due to insufficient quota, set the flag
-            if grep -q "No region with sufficient quota found" scripts/checkquota.sh; then
+            if echo "$QUOTA_OUTPUT" | grep -q "No region with sufficient quota found"; then
               echo "QUOTA_FAILED=true" >> $GITHUB_ENV
             fi
-            exit 1  # Fail the pipeline if any other failure occurs
+            exit 1  # Fail the pipeline if any failure occurs
           fi
 
       - name: Set Quota Failure Output
@@ -358,25 +362,142 @@ jobs:
         shell: bash
         run: exit 1
       
+      - name: Check Azure Search Service Quota
+        id: search-quota-check
+        shell: bash
+        env:
+          INPUT_AZURE_LOCATION: ${{ inputs.azure_location }}
+          TRIGGER_TYPE: ${{ inputs.trigger_type }}
+        run: |
+          # Determine search tier based on WAF (scalability) setting
+          # WAF enabled → standard tier, WAF disabled → basic tier
+          if [[ "${{ env.WAF_ENABLED }}" == "true" ]]; then
+            SEARCH_TIER="standard"
+            SEARCH_TIER_DISPLAY="Standard"
+          else
+            SEARCH_TIER="basic"
+            SEARCH_TIER_DISPLAY="Basic"
+          fi
+
+          # Valid deployment regions (must match Bicep @allowed list)
+          ALL_VALID_REGIONS=("australiaeast" "centralus" "eastasia" "eastus" "japaneast" "northeurope" "southeastasia" "swedencentral" "uksouth" "westus" "westus3")
+
+          # Build ordered list of regions to check:
+          # - Manual triggers: user's region first, then remaining valid regions
+          # - Automatic triggers: all valid regions (no user preference)
+          REGIONS_TO_CHECK=()
+          if [[ "$TRIGGER_TYPE" == "workflow_dispatch" && -n "$INPUT_AZURE_LOCATION" ]]; then
+            echo "📋 Manual trigger: checking user-selected region '$INPUT_AZURE_LOCATION' first"
+            REGIONS_TO_CHECK+=("$INPUT_AZURE_LOCATION")
+            for r in "${ALL_VALID_REGIONS[@]}"; do
+              if [[ "$r" != "$INPUT_AZURE_LOCATION" ]]; then
+                REGIONS_TO_CHECK+=("$r")
+              fi
+            done
+          else
+            echo "📋 Automatic trigger: checking all valid regions for search quota"
+            REGIONS_TO_CHECK=("${ALL_VALID_REGIONS[@]}")
+          fi
+
+          echo "🔍 Checking Azure Search $SEARCH_TIER_DISPLAY tier quota across regions: ${REGIONS_TO_CHECK[*]}"
+          echo ""
+
+          SEARCH_VALID_REGION=""
+          CHECKED_REGIONS=()
+          for REGION in "${REGIONS_TO_CHECK[@]}"; do
+            echo "----------------------------------------"
+            echo "🔍 Checking region: $REGION"
+
+            SEARCH_USAGE=$(az rest --method get \
+              --url "https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/providers/Microsoft.Search/locations/${REGION}/usages?api-version=2024-03-01-preview" \
+              -o json 2>/dev/null || echo '{"value":[]}')
+
+            if [ "$(echo "$SEARCH_USAGE" | jq '.value | length')" -eq 0 ]; then
+              echo "   ⚠️ Could not retrieve Azure Search quota for $REGION. Skipping."
+              CHECKED_REGIONS+=("$REGION: skipped")
+              continue
+            fi
+
+            TIER_USAGE=$(echo "$SEARCH_USAGE" | jq -r --arg tier "$SEARCH_TIER" '.value[] | select(.name.value == $tier) | .currentValue // 0')
+            TIER_LIMIT=$(echo "$SEARCH_USAGE" | jq -r --arg tier "$SEARCH_TIER" '.value[] | select(.name.value == $tier) | .limit // 0')
+            TIER_AVAILABLE=$((TIER_LIMIT - TIER_USAGE))
+
+            echo "   $SEARCH_TIER_DISPLAY Tier: Used=$TIER_USAGE | Limit=$TIER_LIMIT | Available=$TIER_AVAILABLE"
+
+            if [ "$TIER_AVAILABLE" -ge 1 ]; then
+              echo "   ✅ Region '$REGION' has sufficient Azure Search $SEARCH_TIER_DISPLAY quota!"
+              SEARCH_VALID_REGION="$REGION"
+              CHECKED_REGIONS+=("$REGION: ✅ available=$TIER_AVAILABLE")
+              break
+            else
+              echo "   ❌ Insufficient quota in $REGION"
+              CHECKED_REGIONS+=("$REGION: ❌ available=$TIER_AVAILABLE")
+            fi
+          done
+
+          echo ""
+          echo "========================================"
+          if [ -z "$SEARCH_VALID_REGION" ]; then
+            echo "❌ No region with sufficient Azure Search $SEARCH_TIER_DISPLAY tier quota found!"
+            echo ""
+            echo "Regions checked:"
+            for entry in "${CHECKED_REGIONS[@]}"; do
+              echo "  - $entry"
+            done
+
+            # Add error to GitHub Summary
+            echo "## ❌ Azure Search Quota Check Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No region with sufficient Azure Search **$SEARCH_TIER_DISPLAY** tier quota was found." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Region | Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
+            for entry in "${CHECKED_REGIONS[@]}"; do
+              IFS=': ' read -r region status <<< "$entry"
+              echo "| \`$region\` | $status |" >> $GITHUB_STEP_SUMMARY
+            done
+            exit 1
+          fi
+
+          echo "✅ Selected region with Azure Search quota: $SEARCH_VALID_REGION"
+          echo "SEARCH_VALID_REGION=$SEARCH_VALID_REGION" >> $GITHUB_ENV
+          echo "SEARCH_VALID_REGION=$SEARCH_VALID_REGION" >> $GITHUB_OUTPUT
+          echo "SEARCH_QUOTA_CHECK=passed" >> $GITHUB_OUTPUT
+
+          if [[ "$TRIGGER_TYPE" == "workflow_dispatch" && "$SEARCH_VALID_REGION" != "$INPUT_AZURE_LOCATION" ]]; then
+            echo ""
+            echo "⚠️ User-selected region '$INPUT_AZURE_LOCATION' had insufficient search quota."
+            echo "   Falling back to region: $SEARCH_VALID_REGION"
+          fi
+
       - name: Set Deployment Region
         id: set_region
         shell: bash
         env:
           INPUT_AZURE_LOCATION: ${{ inputs.azure_location }}
         run: |
-          echo "Selected Region from Quota Check: $VALID_REGION"
+          echo "Selected Region from OpenAI Quota Check: $VALID_REGION"
+          echo "Selected Region from Search Quota Check: $SEARCH_VALID_REGION"
           echo "AZURE_ENV_OPENAI_LOCATION=$VALID_REGION" >> $GITHUB_ENV
           echo "AZURE_ENV_OPENAI_LOCATION=$VALID_REGION" >> $GITHUB_OUTPUT
-          
+
           if [[ "${{ inputs.trigger_type }}" == "workflow_dispatch" && -n "$INPUT_AZURE_LOCATION" ]]; then
-            USER_SELECTED_LOCATION="$INPUT_AZURE_LOCATION"
-            echo "Using user-selected Azure location: $USER_SELECTED_LOCATION"
-            echo "AZURE_LOCATION=$USER_SELECTED_LOCATION" >> $GITHUB_ENV
-            echo "AZURE_LOCATION=$USER_SELECTED_LOCATION" >> $GITHUB_OUTPUT
+            # Manual trigger: use user's region if it passed search quota, otherwise use search-validated region
+            if [[ "$INPUT_AZURE_LOCATION" == "$SEARCH_VALID_REGION" ]]; then
+              echo "✅ Using user-selected Azure location (search quota verified): $INPUT_AZURE_LOCATION"
+              echo "AZURE_LOCATION=$INPUT_AZURE_LOCATION" >> $GITHUB_ENV
+              echo "AZURE_LOCATION=$INPUT_AZURE_LOCATION" >> $GITHUB_OUTPUT
+            else
+              echo "⚠️ User-selected region '$INPUT_AZURE_LOCATION' had insufficient search quota."
+              echo "   Using fallback region from search quota check: $SEARCH_VALID_REGION"
+              echo "AZURE_LOCATION=$SEARCH_VALID_REGION" >> $GITHUB_ENV
+              echo "AZURE_LOCATION=$SEARCH_VALID_REGION" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "Using location from quota check for automatic triggers: $VALID_REGION"
-            echo "AZURE_LOCATION=$VALID_REGION" >> $GITHUB_ENV
-            echo "AZURE_LOCATION=$VALID_REGION" >> $GITHUB_OUTPUT
+            # Automatic trigger: use the search-quota-validated region
+            echo "Using region from search quota check for automatic triggers: $SEARCH_VALID_REGION"
+            echo "AZURE_LOCATION=$SEARCH_VALID_REGION" >> $GITHUB_ENV
+            echo "AZURE_LOCATION=$SEARCH_VALID_REGION" >> $GITHUB_OUTPUT
           fi
 
       - name: Generate Resource Group Name
@@ -391,7 +512,7 @@ jobs:
             echo "RESOURCE_GROUP_NAME=$INPUT_RESOURCE_GROUP_NAME" >> $GITHUB_ENV
           else
             echo "Generating a unique resource group name..."
-            ACCL_NAME="docgen"  # Account name as specified
+            ACCL_NAME="cntgen"  # Account name as specified
             SHORT_UUID=$(uuidgen | cut -d'-' -f1)
             UNIQUE_RG_NAME="arg-${ACCL_NAME}-${SHORT_UUID}"
             echo "RESOURCE_GROUP_NAME=${UNIQUE_RG_NAME}" >> $GITHUB_ENV
@@ -451,8 +572,8 @@ jobs:
             
             # Determine image tag based on branch
             if [[ "$BRANCH_NAME" == "main" ]]; then
-              IMAGE_TAG="latest_waf"
-              echo "Using main branch - image tag: latest_waf"
+              IMAGE_TAG="latest"
+              echo "Using main branch - image tag: latest"
             elif [[ "$BRANCH_NAME" == "dev" ]]; then
               IMAGE_TAG="dev"
               echo "Using dev branch - image tag: dev"
@@ -460,8 +581,8 @@ jobs:
               IMAGE_TAG="demo"
               echo "Using demo branch - image tag: demo"
             else
-              IMAGE_TAG="latest_waf"
-              echo "Using default for branch '$BRANCH_NAME' - image tag: latest_waf"
+              IMAGE_TAG="latest"
+              echo "Using default for branch '$BRANCH_NAME' - image tag: latest"
             fi
             
             echo "Using existing Docker image tag: $IMAGE_TAG"

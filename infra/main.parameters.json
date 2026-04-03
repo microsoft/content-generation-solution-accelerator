@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "solutionName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "secondaryLocation": {
+      "value": "${SECONDARY_LOCATION}"
+    },
+    "gptModelName": {
+      "value": "${AZURE_OPENAI_GPT_MODEL}"
+    },
+    "gptModelVersion": {
+      "value": "${GPT_MODEL_VERSION}"
+    },
+    "gptModelDeploymentType": {
+      "value": "${GPT_MODEL_DEPLOYMENT_TYPE}"
+    },
+    "gptModelCapacity": {
+      "value": "${GPT_MODEL_CAPACITY}"
+    },
+    "imageModelChoice": {
+      "value": "${AZURE_OPENAI_IMAGE_MODEL}"
+    },
+    "imageModelCapacity": {
+      "value": "${IMAGE_MODEL_CAPACITY}"
+    },
+    "azureOpenaiAPIVersion": {
+      "value": "${AZURE_OPENAI_API_VERSION}"
+    },
+    "azureAiServiceLocation": {
+      "value": "${AZURE_ENV_OPENAI_LOCATION}"
+    },
+    "existingLogAnalyticsWorkspaceId": {
+      "value": "${AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID}"
+    },
+    "azureExistingAIProjectResourceId": {
+      "value": "${AZURE_EXISTING_AI_PROJECT_RESOURCE_ID}"
+    },
+    "acrName": {
+      "value": "${ACR_NAME}"
+    },
+    "imageTag": {
+      "value": "${IMAGE_TAG=latest}"
+    }
+  }
+}

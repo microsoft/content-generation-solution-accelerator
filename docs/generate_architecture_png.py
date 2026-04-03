@@ -19,7 +19,6 @@ HIGHLIGHT_BOX = (50, 70, 95)
 
 def draw_rounded_rect(draw, xy, radius, fill=None, outline=None, width=1):
     """Draw a rounded rectangle"""
-    x1, y1, x2, y2 = xy
     draw.rounded_rectangle(xy, radius=radius, fill=fill, outline=outline, width=width)
 
 def draw_service_box(draw, x, y, w, h, title, subtitle="", icon_type="default", highlight=False):
@@ -69,7 +68,7 @@ def draw_service_box(draw, x, y, w, h, title, subtitle="", icon_type="default", 
     try:
         font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 13)
         font_sub = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
-    except:
+    except OSError:
         font_title = ImageFont.load_default()
         font_sub = ImageFont.load_default()
     
@@ -113,7 +112,7 @@ def main():
     try:
         font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
         font_label = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 9)
-    except:
+    except OSError:
         font_title = ImageFont.load_default()
         font_label = ImageFont.load_default()
     
@@ -134,9 +133,7 @@ def main():
     
     COL1_X = 100
     COL2_X = 340
-    COL3_X = 580
     COL4_X = 820
-    COL5_X = 1100
     
     # === ROW 1: Frontend Tier ===
     # Container Registry
@@ -153,7 +150,7 @@ def main():
     draw_service_box(draw, COL2_X, ROW2_Y, BOX_W, BOX_H, "Container Instance", "Python/Quart API\nBackend", "container", highlight=True)
     
     # Azure OpenAI Service
-    draw_service_box(draw, COL4_X, ROW2_Y, BOX_W+50, BOX_H, "Azure OpenAI", "GPT & DALL-E 3", "ai")
+    draw_service_box(draw, COL4_X, ROW2_Y, BOX_W+50, BOX_H, "Azure OpenAI", "GPT & GPT-Image", "ai")
     
     # === ROW 3: Data Storage ===
     # Blob Storage
@@ -211,13 +208,13 @@ def main():
     # Copyright
     try:
         font_copy = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
-    except:
+    except OSError:
         font_copy = ImageFont.load_default()
     
     draw.text((50, HEIGHT-30), "© 2024 Microsoft Corporation All rights reserved.", fill=TEXT_GRAY, font=font_copy)
     
     # Save image
-    output_path = "/home/jahunte/content-generation-solution-accelerator/docs/images/readme/solution_architecture.png"
+    output_path = os.path.join(os.path.dirname(__file__), "images", "readme", "solution_architecture.png")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     img.save(output_path, "PNG")
     print(f"Architecture diagram saved to: {output_path}")

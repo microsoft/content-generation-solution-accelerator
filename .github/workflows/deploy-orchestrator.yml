@@ -61,13 +61,15 @@ on:
         description: 'Trigger type (workflow_dispatch, pull_request, schedule)'
         required: true
         type: string
+      image_model_choice:
+        description: 'Image model to deploy (gpt-image-1-mini, gpt-image-1.5, none)'
+        required: false
+        default: 'gpt-image-1-mini'
+        type: string
 
 env:
   AZURE_DEV_COLLECT_TELEMETRY: ${{ vars.AZURE_DEV_COLLECT_TELEMETRY }}
-permissions:
-  contents: read
-  actions: read
-  
+
 jobs:
   docker-build:
     uses: ./.github/workflows/job-docker-build.yml
@@ -94,6 +96,7 @@ jobs:
       docker_image_tag: ${{ needs.docker-build.outputs.IMAGE_TAG }}
       run_e2e_tests: ${{ inputs.run_e2e_tests }}
       cleanup_resources: ${{ inputs.cleanup_resources }}
+      image_model_choice: ${{ inputs.image_model_choice }}
     secrets: inherit
 
   e2e-test:
@@ -103,25 +106,6 @@ jobs:
     with:
       DOCGEN_URL: ${{ needs.deploy.outputs.WEB_APPURL || inputs.existing_webapp_url }}
       TEST_SUITE: ${{ inputs.trigger_type == 'workflow_dispatch' && inputs.run_e2e_tests || 'GoldenPath-Testing' }}
-    secrets: inherit
-
-  send-notification:
-    if: "!cancelled()"
-    needs: [docker-build, deploy, e2e-test]
-    uses: ./.github/workflows/job-send-notification.yml
-    with:
-      trigger_type: ${{ inputs.trigger_type }}
-      waf_enabled: ${{ inputs.waf_enabled }}
-      EXP: ${{ inputs.EXP }}
-      run_e2e_tests: ${{ inputs.run_e2e_tests }}
-      existing_webapp_url: ${{ inputs.existing_webapp_url }}
-      deploy_result: ${{ needs.deploy.result }}
-      e2e_test_result: ${{ needs.e2e-test.result }}
-      WEB_APPURL: ${{ needs.deploy.outputs.WEB_APPURL || inputs.existing_webapp_url }}
-      RESOURCE_GROUP_NAME: ${{ needs.deploy.outputs.RESOURCE_GROUP_NAME }}
-      QUOTA_FAILED: ${{ needs.deploy.outputs.QUOTA_FAILED }}
-      TEST_SUCCESS: ${{ needs.e2e-test.outputs.TEST_SUCCESS }}
-      TEST_REPORT_URL: ${{ needs.e2e-test.outputs.TEST_REPORT_URL }}
     secrets: inherit
 
   cleanup-deployment:
@@ -138,4 +122,24 @@ jobs:
       AZURE_ENV_OPENAI_LOCATION: ${{ needs.deploy.outputs.AZURE_ENV_OPENAI_LOCATION }}
       ENV_NAME: ${{ needs.deploy.outputs.ENV_NAME }}
       IMAGE_TAG: ${{ needs.deploy.outputs.IMAGE_TAG }}
+    secrets: inherit
+
+  send-notification:
+    if: "!cancelled()"
+    needs: [docker-build, deploy, e2e-test, cleanup-deployment]
+    uses: ./.github/workflows/job-send-notification.yml
+    with:
+      trigger_type: ${{ inputs.trigger_type }}
+      waf_enabled: ${{ inputs.waf_enabled }}
+      EXP: ${{ inputs.EXP }}
+      run_e2e_tests: ${{ inputs.run_e2e_tests }}
+      existing_webapp_url: ${{ inputs.existing_webapp_url }}
+      deploy_result: ${{ needs.deploy.result }}
+      e2e_test_result: ${{ needs.e2e-test.result }}
+      WEB_APPURL: ${{ needs.deploy.outputs.WEB_APPURL || inputs.existing_webapp_url }}
+      RESOURCE_GROUP_NAME: ${{ needs.deploy.outputs.RESOURCE_GROUP_NAME }}
+      QUOTA_FAILED: ${{ needs.deploy.outputs.QUOTA_FAILED }}
+      TEST_SUCCESS: ${{ needs.e2e-test.outputs.TEST_SUCCESS }}
+      TEST_REPORT_URL: ${{ needs.e2e-test.outputs.TEST_REPORT_URL }}
+      cleanup_result: ${{ needs.cleanup-deployment.result }}
     secrets: inherit

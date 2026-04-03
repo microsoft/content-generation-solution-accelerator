@@ -38,15 +38,14 @@ on:
       WEB_APPURL:
         description: "Container Web App URL"
         value: ${{ jobs.deploy-windows.outputs.WEB_APPURL }}
-permissions:
-  contents: read
-  actions: read
-  
+
 jobs:
   deploy-windows:
     runs-on: windows-latest
+    environment: production
     env:
       AZURE_DEV_COLLECT_TELEMETRY: ${{ vars.AZURE_DEV_COLLECT_TELEMETRY }}
+      PYTHONUTF8: 1
     outputs:
       WEB_APPURL: ${{ steps.get_output_windows.outputs.WEB_APPURL }}
     steps:
@@ -184,7 +183,7 @@ jobs:
           echo "✅ All input parameters validated successfully!"
 
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Configure Parameters Based on WAF Setting
         shell: bash
@@ -201,13 +200,17 @@ jobs:
       - name: Setup Azure Developer CLI (Windows)
         uses: Azure/setup-azd@v2
 
-      - name: Login to AZD
-        id: login-azure
+      - name: Login to Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to AZD (OIDC)
         shell: bash
         run: |
-          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-          az account set --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          azd auth login --client-id ${{ secrets.AZURE_CLIENT_ID }} --client-secret ${{ secrets.AZURE_CLIENT_SECRET }} --tenant-id ${{ secrets.AZURE_TENANT_ID }}
+          azd auth login --client-id ${{ secrets.AZURE_CLIENT_ID }} --federated-credential-provider github --tenant-id ${{ secrets.AZURE_TENANT_ID }}
 
 
       - name: Deploy using azd up and extract values (Windows)
@@ -238,12 +241,13 @@ jobs:
           azd env set AZURE_ENV_OPENAI_LOCATION="$env:AZURE_ENV_OPENAI_LOCATION"
           azd env set AZURE_LOCATION="$env:AZURE_LOCATION"
           azd env set AZURE_RESOURCE_GROUP="$env:RESOURCE_GROUP_NAME"
-          azd env set AZURE_ENV_IMAGETAG="$env:IMAGE_TAG"
+          azd env set IMAGE_TAG="$env:IMAGE_TAG"
           
           # Set ACR name only when building Docker image
           if ($env:BUILD_DOCKER_IMAGE -eq "true") {
-            $ACR_NAME = "${{ secrets.ACR_TEST_USERNAME }}"
-            azd env set AZURE_ENV_ACR_NAME="$ACR_NAME"
+            # Extract ACR name from login server (e.g., myacr.azurecr.io -> myacr)
+            $ACR_NAME = ("${{ secrets.ACR_TEST_LOGIN_SERVER }}").Split('.')[0]
+            azd env set ACR_NAME="$ACR_NAME"
             Write-Host "Set ACR name to: $ACR_NAME"
           } else {
             Write-Host "Skipping ACR name configuration (using existing image)"
@@ -275,65 +279,14 @@ jobs:
 
           # Deploy using azd up
           azd up --no-prompt
-          
+
           Write-Host "✅ Deployment succeeded."
 
           # Get deployment outputs using azd
           Write-Host "Extracting deployment outputs..."
-          $DEPLOY_OUTPUT = azd env get-values --output json | ConvertFrom-Json
-          Write-Host "Deployment output: $($DEPLOY_OUTPUT | ConvertTo-Json -Depth 10)"
-          
-          if (-not $DEPLOY_OUTPUT) {
-            Write-Host "Error: Deployment output is empty. Please check the deployment logs."
-            exit 1
-          }
-
-
-          $AI_FOUNDRY_RESOURCE_ID = $DEPLOY_OUTPUT.AI_FOUNDRY_RESOURCE_ID
-          "AI_FOUNDRY_RESOURCE_ID=$AI_FOUNDRY_RESOURCE_ID" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-          $AI_SEARCH_SERVICE_NAME = $DEPLOY_OUTPUT.AI_SEARCH_SERVICE_NAME
-          "AI_SEARCH_SERVICE_NAME=$AI_SEARCH_SERVICE_NAME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-          $AZURE_COSMOSDB_ACCOUNT = $DEPLOY_OUTPUT.AZURE_COSMOSDB_ACCOUNT
-          "AZURE_COSMOSDB_ACCOUNT=$AZURE_COSMOSDB_ACCOUNT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-          $STORAGE_ACCOUNT_NAME = $DEPLOY_OUTPUT.STORAGE_ACCOUNT_NAME
-          "STORAGE_ACCOUNT_NAME=$STORAGE_ACCOUNT_NAME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-          $STORAGE_CONTAINER_NAME = $DEPLOY_OUTPUT.STORAGE_CONTAINER_NAME
-          "STORAGE_CONTAINER_NAME=$STORAGE_CONTAINER_NAME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-          $KEY_VAULT_NAME = $DEPLOY_OUTPUT.KEY_VAULT_NAME
-          "KEY_VAULT_NAME=$KEY_VAULT_NAME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-          $RESOURCE_GROUP_NAME = $DEPLOY_OUTPUT.RESOURCE_GROUP_NAME
-          "RESOURCE_GROUP_NAME=$RESOURCE_GROUP_NAME" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-          $WEB_APP_URL = $DEPLOY_OUTPUT.WEB_APP_URL
-          "WEB_APPURL=$WEB_APP_URL" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "WEB_APPURL=$WEB_APP_URL" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
-      - name: Run Post-Deployment Script
-        id: post_deploy
-        env: 
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        shell: bash
-        run: |
-          set -e
-          az account set --subscription "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-
-          echo "Running post-deployment script..."
-
-          bash ./infra/scripts/process_sample_data.sh \
-            "${{ env.STORAGE_ACCOUNT_NAME }}" \
-            "${{ env.STORAGE_CONTAINER_NAME }}" \
-            "${{ env.KEY_VAULT_NAME }}" \
-            "${{ env.AZURE_COSMOSDB_ACCOUNT }}" \
-            "${{ env.RESOURCE_GROUP_NAME }}" \
-            "${{ env.AI_SEARCH_SERVICE_NAME }}" \
-            "${{ secrets.AZURE_CLIENT_ID }}" \
-            "${{ env.AI_FOUNDRY_RESOURCE_ID }}"
+          $webAppUrl = azd env get-value WEB_APP_URL
+          echo "WEB_APPURL=$webAppUrl" >> $env:GITHUB_ENV
+          echo "WEB_APPURL=$webAppUrl" >> $env:GITHUB_OUTPUT
 
       - name: Generate Deploy Job Summary
         if: always()
