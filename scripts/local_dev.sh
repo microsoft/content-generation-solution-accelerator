@@ -34,7 +34,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SRC_DIR="$PROJECT_ROOT/src"
 BACKEND_DIR="$SRC_DIR/backend"
-FRONTEND_DIR="$SRC_DIR/app/frontend"
+FRONTEND_DIR="$SRC_DIR/app"
 
 # Default ports
 BACKEND_PORT=${BACKEND_PORT:-5000}

@@ -9,7 +9,7 @@
 # Build outputs (will be built in container)
 static/
 **/dist/
-frontend-server/static/
+server/static/
 
 # Development files
 *.log
@@ -36,7 +36,6 @@ Thumbs.db
 
 # Deployment artifacts
 *.zip
-frontend-deploy.zip
 
 # Backend not needed for frontend build (and vice versa)
 # Comment out if building full-stack image

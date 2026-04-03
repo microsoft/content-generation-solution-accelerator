@@ -31,7 +31,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 $SrcDir = Join-Path $ProjectRoot "src"
 $BackendDir = Join-Path $SrcDir "backend"
-$FrontendDir = Join-Path $SrcDir "app\frontend"
+$FrontendDir = Join-Path $SrcDir "app"
 
 # Default ports
 $BackendPort = if ($env:BACKEND_PORT) { $env:BACKEND_PORT } else { "5000" }
