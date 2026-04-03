@@ -3,21 +3,22 @@ Title Generation Service - Generates concise conversation titles using AI.
 
 This service provides a dedicated agent for generating meaningful,
 short titles for chat conversations based on the user's first message.
+
+Supports both Azure AI Foundry mode (pre-created agents) and
+Azure OpenAI Direct mode (in-memory agents).
 """
 
 import logging
 import re
 from typing import Optional
 
-from agent_framework.azure import AzureOpenAIChatClient
+from agent_framework.azure import AzureOpenAIResponsesClient, AzureAIProjectAgentProvider
 from azure.identity import DefaultAzureCredential
+from azure.identity.aio import DefaultAzureCredential as AsyncDefaultAzureCredential
 
 from settings import app_settings
 
 logger = logging.getLogger(__name__)
-
-# Token endpoint for Azure OpenAI authentication
-TOKEN_ENDPOINT = "https://cognitiveservices.azure.com/.default"
 
 # Title generation instructions (from MS reference accelerator)
 TITLE_INSTRUCTIONS = """Summarize the conversation so far into a 4-word or less title.
@@ -31,49 +32,67 @@ class TitleService:
     def __init__(self):
         self._agent = None
         self._initialized = False
-        self._credential = None
+        self._use_foundry = app_settings.ai_foundry.use_foundry
+        self._provider = None  # AzureAIProjectAgentProvider (Foundry mode only)
 
-    def initialize(self) -> None:
-        """Initialize the title generation agent."""
+    async def initialize(self) -> None:
+        """Initialize the title generation agent.
+
+        Foundry mode: retrieves pre-created TitleAgent via
+        AzureAIProjectAgentProvider.get_agent(name=...).
+
+        Direct mode: creates in-memory agent via
+        AzureOpenAIResponsesClient.as_agent(name=..., instructions=...).
+        """
         if self._initialized:
             return
 
         try:
-            self._credential = DefaultAzureCredential()
-            use_foundry = app_settings.ai_foundry.use_foundry
+            if self._use_foundry:
+                # --- Foundry mode: retrieve pre-created TitleAgent ---
+                project_endpoint = app_settings.ai_foundry.project_endpoint
+                if not project_endpoint:
+                    logger.warning("Title service: AZURE_AI_PROJECT_ENDPOINT not configured, using fallback")
+                    return
 
-            if use_foundry:
-                # Azure AI Foundry mode
-                endpoint = app_settings.azure_openai.endpoint
-                deployment = app_settings.ai_foundry.model_deployment or app_settings.azure_openai.gpt_model
+                agent_name = app_settings.ai_foundry.agent_names.get("title")
+                if not agent_name:
+                    logger.warning("Title service: AGENT_NAME_TITLE not configured, using fallback")
+                    return
+
+                async_credential = AsyncDefaultAzureCredential()
+                self._provider = AzureAIProjectAgentProvider(
+                    project_endpoint=project_endpoint,
+                    credential=async_credential,
+                )
+
+                logger.info(f"Retrieving TitleAgent from Foundry project: {agent_name}")
+                self._agent = await self._provider.get_agent(name=agent_name)
+                logger.info("TitleAgent retrieved from Foundry project")
+
             else:
-                # Azure OpenAI Direct mode
+                # --- Direct mode: create in-memory agent ---
                 endpoint = app_settings.azure_openai.endpoint
+                if not endpoint:
+                    logger.warning("Title service: Azure OpenAI endpoint not configured, using fallback")
+                    return
+
                 deployment = app_settings.azure_openai.gpt_model
+                api_version = app_settings.azure_openai.api_version
 
-            if not endpoint:
-                logger.warning("Title service: Azure OpenAI endpoint not configured, title generation disabled")
-                return
+                credential = DefaultAzureCredential()
+                chat_client = AzureOpenAIResponsesClient(
+                    endpoint=endpoint,
+                    deployment_name=deployment,
+                    api_version=api_version,
+                    credential=credential,
+                )
 
-            api_version = app_settings.azure_openai.api_version
-
-            # Create token provider function
-            def get_token() -> str:
-                """Token provider callable - invoked for each request to ensure fresh tokens."""
-                token = self._credential.get_token(TOKEN_ENDPOINT)
-                return token.token
-
-            chat_client = AzureOpenAIChatClient(
-                endpoint=endpoint,
-                deployment_name=deployment,
-                api_version=api_version,
-                ad_token_provider=get_token,
-            )
-
-            self._agent = chat_client.create_agent(
-                name="title_agent",
-                instructions=TITLE_INSTRUCTIONS,
-            )
+                self._agent = chat_client.as_agent(
+                    name="title_agent",
+                    instructions=TITLE_INSTRUCTIONS,
+                )
+                logger.info("TitleAgent created in Direct mode")
 
             self._initialized = True
 
@@ -103,7 +122,7 @@ class TitleService:
             return "New Conversation"
 
         if not self._initialized:
-            self.initialize()
+            await self.initialize()
 
         if self._agent is None:
             logger.warning("Title generation: agent not available, using fallback")
@@ -141,9 +160,12 @@ _title_service: Optional[TitleService] = None
 
 
 def get_title_service() -> TitleService:
-    """Get or create the singleton title service instance."""
+    """Get or create the singleton title service instance.
+
+    Note: initialize() is async and is called lazily by generate_title()
+    on first use.
+    """
     global _title_service
     if _title_service is None:
         _title_service = TitleService()
-        _title_service.initialize()
     return _title_service
