@@ -3,6 +3,15 @@ name: "Create Release"
 on:
   push:
     branches: ["main"]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'LICENSE'
+      - '**/*.png'
+      - '**/*.svg'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.gif'
 
   workflow_dispatch:
 

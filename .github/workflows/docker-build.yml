@@ -10,6 +10,8 @@ on:
       - 'src/backend/**'
       - 'src/app/frontend/**'
       - 'src/app/frontend-server/**'
+      - 'src/app/WebApp.Dockerfile'
+      - 'src/app/.dockerignore'
       - '.github/workflows/docker-build.yml'
   pull_request:
     types:
@@ -25,6 +27,8 @@ on:
       - 'src/backend/**'
       - 'src/app/frontend/**'
       - 'src/app/frontend-server/**'
+      - 'src/app/WebApp.Dockerfile'
+      - 'src/app/.dockerignore'
       - '.github/workflows/docker-build.yml'
   workflow_dispatch:
 
@@ -32,6 +36,11 @@ permissions:
   contents: read
   actions: read
   id-token: write  # Required for OIDC-based Azure authentication
+
+concurrency:
+  group: docker-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest

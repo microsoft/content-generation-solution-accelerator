@@ -6,8 +6,10 @@ on:
     paths:
       - 'src/**'
       - '!src/tests/**'
+      - '!src/pytest.ini'
       - 'infra/**/*.bicep'
       - 'infra/**/*.json'
+      - 'infra/scripts/**'
       - '*.yaml'
       - 'scripts/**'
       - '.github/workflows/deploy-*.yml'

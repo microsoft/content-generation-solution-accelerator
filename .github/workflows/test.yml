@@ -6,8 +6,9 @@ on:
       - main
       - dev
     paths:
-      - '**/*.py'
+      - 'src/**/*.py'
       - 'src/backend/requirements*.txt'
+      - 'src/pytest.ini'
       - '.github/workflows/test.yml'
   pull_request:
     types:
@@ -19,13 +20,18 @@ on:
       - main
       - dev
     paths:
-      - '**/*.py'
+      - 'src/**/*.py'
       - 'src/backend/requirements*.txt'
+      - 'src/pytest.ini'
       - '.github/workflows/test.yml'
 
 permissions:
   contents: read
   actions: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend_tests:
@@ -39,6 +45,8 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+          cache: 'pip'
+          cache-dependency-path: src/backend/requirements*.txt
 
       - name: Install Backend Dependencies
         run: |
