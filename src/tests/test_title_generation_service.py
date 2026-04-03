@@ -170,7 +170,7 @@ class TestGetTitleServiceSingleton:
         mock_cls.return_value = mock_instance
         result = get_title_service()
         mock_cls.assert_called_once()
-        mock_instance.initialize.assert_called_once()
+        # initialize() is now async and deferred to first generate_title() call
         assert result is mock_instance
 
     @patch("services.title_service._title_service")

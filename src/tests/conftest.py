@@ -15,7 +15,41 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator
 
 import pytest
+from unittest.mock import MagicMock
+
 from quart import Quart
+
+
+def _mock_agent_framework_modules():
+    """Mock agent_framework modules or patch missing attributes.
+
+    This allows tests to run with older agent-framework versions.
+    Handles two cases:
+    1. Module not installed at all → create full mock
+    2. Module installed but missing new attributes → patch missing attrs
+    """
+    # Define required attributes for each module
+    required_attrs = {
+        "agent_framework": ["Message", "WorkflowEvent"],
+        "agent_framework.orchestrations": ["HandoffBuilder", "HandoffAgentUserRequest"],
+        "agent_framework.azure": ["AzureOpenAIResponsesClient", "AzureAIProjectAgentProvider"],
+    }
+
+    for module_name, attrs in required_attrs.items():
+        try:
+            # Try to import the module
+            module = __import__(module_name, fromlist=attrs)
+            # Patch any missing attributes
+            for attr in attrs:
+                if not hasattr(module, attr):
+                    setattr(module, attr, MagicMock())
+            sys.modules[module_name] = module
+        except (ImportError, ModuleNotFoundError):
+            # Module not available - create a full mock
+            mock_module = MagicMock()
+            for attr in attrs:
+                setattr(mock_module, attr, MagicMock())
+            sys.modules[module_name] = mock_module
 
 
 def pytest_configure(config):
@@ -24,6 +58,9 @@ def pytest_configure(config):
     Only sets variables absolutely required to import settings.py without errors.
     All other test environment configuration is handled by the mock_environment fixture.
     """
+    # Mock agent_framework modules if not available (before any imports)
+    _mock_agent_framework_modules()
+
     # AZURE_OPENAI_ENDPOINT is required by _AzureOpenAISettings validator
     os.environ.setdefault("AZURE_OPENAI_ENDPOINT", "https://test.openai.azure.com/")
 
