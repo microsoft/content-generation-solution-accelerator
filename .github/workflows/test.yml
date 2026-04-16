@@ -28,6 +28,7 @@ on:
 permissions:
   contents: read
   actions: read
+  pull-requests: write
 
 concurrency:
   group: test-${{ github.ref }}
@@ -69,9 +70,20 @@ jobs:
       - name: Run Backend Tests with Coverage
         if: env.skip_backend_tests == 'false'
         run: |
-          pytest --cov=. --cov-report=term-missing --cov-report=xml ./src/tests
+          pytest --cov=. --cov-report=term-missing --cov-report=xml --junitxml=pytest.xml ./src/tests
 
       - name: Skip Backend Tests
         if: env.skip_backend_tests == 'true'
         run: |
           echo "Skipping backend tests because no test files were found."
+
+      - name: Pytest Coverage Comment
+        uses:  MishaKav/pytest-coverage-comment@v1.6.0
+        with:
+          pytest-xml-coverage-path: coverage.xml
+          junitxml-path: pytest.xml
+          title: "Python Test Coverage Report"
+          badge-title: "Python Test Coverage"
+          junitxml-title: "Python Unit Test Overview"
+          default-branch: "main"
+          report-only-changed-files: true
