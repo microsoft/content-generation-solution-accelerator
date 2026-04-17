@@ -105,7 +105,7 @@ ensure_azure_ai_user_role() {
     local existing_project_id=""
     local foundry_resource_id=""
     if [ -f ".env" ]; then
-        existing_project_id=$(grep "^AZURE_EXISTING_AI_PROJECT_RESOURCE_ID=" .env | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
+        existing_project_id=$(grep "^AZURE_EXISTING_AIPROJECT_RESOURCE_ID=" .env | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
         foundry_resource_id=$(grep "^AI_FOUNDRY_RESOURCE_ID=" .env | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
     fi
     
@@ -115,7 +115,7 @@ ensure_azure_ai_user_role() {
     elif [ -n "$foundry_resource_id" ]; then
         scope="$foundry_resource_id"
     else
-        print_error "Neither AZURE_EXISTING_AI_PROJECT_RESOURCE_ID nor AI_FOUNDRY_RESOURCE_ID found in .env"
+        print_error "Neither AZURE_EXISTING_AIPROJECT_RESOURCE_ID nor AI_FOUNDRY_RESOURCE_ID found in .env"
         exit 1
     fi
     
@@ -283,9 +283,9 @@ setup() {
     # Check for .env file
     if [ ! -f ".env" ]; then
         print_warning ".env file not found"
-        if [ -f ".env.template" ]; then
-            print_info "Copying .env.template to .env..."
-            cp .env.template .env
+        if [ -f ".env.sample" ]; then
+            print_info "Copying .env.sample to .env..."
+            cp .env.sample .env
             print_warning "Please update .env with your Azure resource values"
         fi
     else
@@ -340,9 +340,9 @@ generate_env() {
         print_warning "Azure Developer CLI not found or no azure.yaml"
         print_info "Please manually update .env with your Azure resource values"
         
-        if [ ! -f ".env" ] && [ -f ".env.template" ]; then
-            cp .env.template .env
-            print_info "Created .env from template"
+        if [ ! -f ".env" ] && [ -f ".env.sample" ]; then
+            cp .env.sample .env
+            print_info "Created .env from .env.sample"
         fi
     fi
     
@@ -437,20 +437,45 @@ start_all() {
     
     cd "$PROJECT_ROOT"
     
-    # Check prerequisites
+    # Handle .env: generate if missing, or prompt to refresh if exists
     if [ ! -f ".env" ]; then
-        print_error ".env file not found. Run: ./scripts/local_dev.sh setup"
-        exit 1
+        print_warning ".env file not found. Generating from Azure resources..."
+        generate_env
+        # Fallback to .env.sample if generation didn't produce .env
+        if [ ! -f ".env" ] && [ -f ".env.sample" ]; then
+            print_warning "Env generation did not create .env. Copying .env.sample as fallback..."
+            cp .env.sample .env
+            print_info "Created .env from .env.sample. Update the file with your Azure resource values."
+        fi
+        if [ ! -f ".env" ]; then
+            print_error "Failed to create .env. Run './scripts/local_dev.sh env' or create .env manually from .env.sample."
+            exit 1
+        fi
+    else
+        print_success "Found existing .env file"
+        read -p "Do you want to overwrite it with fresh values from Azure deployment? (y/N): " overwrite
+        if [ "$overwrite" = "y" ] || [ "$overwrite" = "Y" ]; then
+            print_info "Regenerating .env from Azure resources..."
+            rm -f .env
+            generate_env
+            print_success "Environment variables refreshed."
+        else
+            print_info "Preserving existing .env. Using local configuration."
+        fi
     fi
     
+    # Auto-run setup if prerequisites are missing
+    local needs_setup=false
     if [ ! -d ".venv" ]; then
-        print_error "Virtual environment not found. Run: ./scripts/local_dev.sh setup"
-        exit 1
+        print_warning "Virtual environment not found. Running setup..."
+        needs_setup=true
     fi
-    
     if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
-        print_error "Frontend dependencies not found. Run: ./scripts/local_dev.sh setup"
-        exit 1
+        print_warning "Frontend dependencies not found. Running setup..."
+        needs_setup=true
+    fi
+    if [ "$needs_setup" = true ]; then
+        setup
     fi
     
     # Ensure Azure authentication and role assignments
@@ -475,7 +500,7 @@ start_all() {
     (
         cd "$PROJECT_ROOT"
         source .venv/bin/activate
-        export PYTHONPATH="$SRC_DIR"
+        export PYTHONPATH="$BACKEND_DIR"
         export DOTENV_PATH="$PROJECT_ROOT/.env"
         set -a
         source "$PROJECT_ROOT/.env"
@@ -566,7 +591,7 @@ case "${1:-}" in
     ""|all)
         start_all
         ;;
-    *)
+    help|*)
         echo "Content Generation Accelerator - Local Development"
         echo ""
         echo "Usage: $0 [command]"
@@ -579,6 +604,7 @@ case "${1:-}" in
         echo "  all       Start both backend and frontend (default)"
         echo "  build     Build frontend for production"
         echo "  clean     Remove cache and build artifacts"
+        echo "  help      Show this help message"
         echo ""
         echo "Environment Variables:"
         echo "  BACKEND_PORT   Backend port (default: 5000)"

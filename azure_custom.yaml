@@ -1,48 +1,285 @@
-environment:
-  name: document-generation
-  location: eastus
-
-name: document-generation
+name: content-generation
 metadata:
-  template: document-generation@1.0
+  template: content-generation@1.22
 
 requiredVersions:
-  azd: '>= 1.18.0'
+  azd: '>= 1.18.0 != 1.23.9'
 
-parameters:
-  solutionPrefix:
-    type: string
-    default: bs-azdtest  
-  otherLocation:
-    type: string
-    default: eastus2
-  baseUrl:
-    type: string
-    default: 'https://github.com/microsoft/document-generation-solution-accelerator'
+infra:
+  path: ./infra
+  module: main
 
 services:
-   webapp:
-    project: ./src
-    language: py
+  frontend:
+    project: ./src/app/frontend-server
+    language: js
     host: appservice
     dist: ./dist
+    resourceName: ${APP_SERVICE_NAME}
     hooks:
       prepackage:
         windows:
           shell: pwsh
-          run: ../infra/scripts/package_webapp.ps1
-          interactive: true
+          run: ../../../infra/scripts/package_frontend.ps1
           continueOnError: false
         posix:
           shell: sh
-          run: bash ../infra/scripts/package_webapp.sh
-          interactive: true
+          run: chmod +x ../../../infra/scripts/package_frontend.sh && ../../../infra/scripts/package_frontend.sh
           continueOnError: false
 
-deployment:
-  mode: Incremental
-  template: ./infra/main.bicep  # Path to the main.bicep file inside the 'deployment' folder
-  parameters:
-    solutionPrefix: ${parameters.solutionPrefix}
-    otherLocation: ${parameters.otherLocation}
-    baseUrl: ${parameters.baseUrl}
+hooks:
+  preprovision:
+    windows:
+      shell: pwsh
+      run: |
+        Write-Host "Preparing deployment..." -ForegroundColor Cyan
+        
+        # Check if image exists in the ACR (handles fresh deploy AND deployment mode switch)
+        $acrName = azd env get-value AZURE_ENV_CONTAINER_REGISTRY_NAME 2>$null
+        $global:LASTEXITCODE = 0
+        $skipAci = $false
+        
+        if (-not $acrName) {
+          Write-Host "First deployment - ACI will be deployed after image build" -ForegroundColor Yellow
+          $skipAci = $true
+        } elseif ($acrName -eq 'contentgencontainerreg') {
+          # Switching from standard (shared ACR) to custom (own ACR) deployment
+          # Clear ACI name so postprovision deploys fresh with new ACR
+          Write-Host "Switching to custom deployment - ACI will be redeployed with new ACR" -ForegroundColor Yellow
+          azd env set CONTAINER_INSTANCE_NAME ""
+          $skipAci = $true
+        } else {
+          # Custom ACR exists - check if image is present
+          Write-Host "Checking for existing image in $acrName..." -ForegroundColor Cyan
+          $imageCheck = az acr repository show --name $acrName --image "content-gen-api:latest" 2>$null
+          $global:LASTEXITCODE = 0
+          
+          if (-not $imageCheck) {
+            Write-Host "Image not found in ACR - will build in postprovision" -ForegroundColor Yellow
+            $skipAci = $true
+          } else {
+            Write-Host "Image found - ACI deployment will proceed" -ForegroundColor Green
+          }
+        }
+        
+        if ($skipAci) {
+          azd env set AZURE_ENV_IMAGE_TAG none
+        }
+      continueOnError: false
+    posix:
+      shell: sh
+      run: |
+        echo "Preparing deployment..."
+        
+        # Check if image exists in the ACR (handles fresh deploy AND deployment mode switch)
+        ACR_NAME=$(azd env get-value AZURE_ENV_CONTAINER_REGISTRY_NAME 2>/dev/null || echo "")
+        SKIP_ACI=false
+        
+        if [ -z "$ACR_NAME" ]; then
+          echo "First deployment - ACI will be deployed after image build"
+          SKIP_ACI=true
+        elif [ "$ACR_NAME" = "contentgencontainerreg" ]; then
+          # Switching from standard (shared ACR) to custom (own ACR) deployment
+          # Clear ACI name so postprovision deploys fresh with new ACR
+          echo "Switching to custom deployment - ACI will be redeployed with new ACR"
+          azd env set CONTAINER_INSTANCE_NAME ""
+          SKIP_ACI=true
+        else
+          # Custom ACR exists - check if image is present
+          echo "Checking for existing image in $ACR_NAME..."
+          if az acr repository show --name "$ACR_NAME" --image "content-gen-api:latest" >/dev/null 2>&1; then
+            echo "Image found - ACI deployment will proceed"
+          else
+            echo "Image not found in ACR - will build in postprovision"
+            SKIP_ACI=true
+          fi
+        fi
+        
+        if [ "$SKIP_ACI" = "true" ]; then
+          azd env set AZURE_ENV_IMAGE_TAG none
+        fi
+      continueOnError: false
+
+  postprovision:
+    windows:
+      shell: pwsh
+      run: |
+        $acrName = $env:AZURE_ENV_CONTAINER_REGISTRY_NAME
+        $resourceGroup = $env:RESOURCE_GROUP_NAME
+        $backendImage = $env:BACKEND_IMAGE_NAME
+        $appServiceName = $env:APP_SERVICE_NAME
+        
+        if (-not $acrName -or -not $resourceGroup -or -not $appServiceName) {
+          Write-Host "ERROR: Missing required environment variables" -ForegroundColor Red
+          exit 1
+        }
+        
+        # Check if ACI already exists (reads from persisted azd env)
+        $aciName = azd env get-value CONTAINER_INSTANCE_NAME 2>$null
+        $global:LASTEXITCODE = 0
+        
+        # ===== Build Backend Image (ACR Build) =====
+        Write-Host ""
+        Write-Host "===== Building Backend Image =====" -ForegroundColor Yellow
+        Write-Host "Registry: $acrName" -ForegroundColor Cyan
+        Write-Host "Image: ${backendImage}:latest" -ForegroundColor Cyan
+        
+        az acr login --name $acrName 2>$null
+        az acr build --registry $acrName --image "${backendImage}:latest" --file ./src/backend/ApiApp.Dockerfile ./src/backend
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "Failed to build container image" -ForegroundColor Red
+          exit 1
+        }
+        Write-Host "Container image built and pushed successfully!" -ForegroundColor Green
+        
+        # ===== Deploy ACI if not already deployed =====
+        if (-not $aciName) {
+          Write-Host ""
+          Write-Host "===== Deploying Container Instance =====" -ForegroundColor Yellow
+          azd env set AZURE_ENV_IMAGE_TAG latest
+          
+          # Use az deployment instead of azd provision to avoid hook recursion
+          # Pass parameters inline (main.parameters.json uses AZD ${VAR} syntax not supported by az CLI)
+          Write-Host "Deploying ACI via Bicep..." -ForegroundColor Cyan
+          
+          az deployment group create `
+            --resource-group $resourceGroup `
+            --template-file ./infra/main.bicep `
+            --parameters solutionName=$env:AZURE_ENV_NAME `
+            --parameters location=$env:AZURE_LOCATION `
+            --parameters azureAiServiceLocation=$env:AZURE_ENV_AI_SERVICE_LOCATION `
+            --parameters imageTag=latest `
+            --query "properties.outputs" -o json | Out-Null
+          
+          if ($LASTEXITCODE -eq 0) {
+            # Refresh azd env with new outputs
+            azd env refresh --no-prompt 2>$null
+            Write-Host "Container Instance deployed successfully!" -ForegroundColor Green
+          } else {
+            Write-Host "Container Instance deployment failed" -ForegroundColor Red
+          }
+        } else {
+          Write-Host ""
+          Write-Host "Restarting Container Instance to pick up new image..." -ForegroundColor Yellow
+          az container restart --name $aciName --resource-group $resourceGroup 2>$null
+          Write-Host "Container Instance: $aciName (restarted)" -ForegroundColor Cyan
+        }
+        
+        Write-Host ""
+        Write-Host "===== Postprovision Complete - Frontend will deploy next =====" -ForegroundColor Green
+        exit 0
+      interactive: true
+      continueOnError: false
+
+    posix:
+      shell: sh
+      run: |
+        ACR_NAME="$AZURE_ENV_CONTAINER_REGISTRY_NAME"
+        RESOURCE_GROUP="$RESOURCE_GROUP_NAME"
+        BACKEND_IMAGE="$BACKEND_IMAGE_NAME"
+        APP_SERVICE="$APP_SERVICE_NAME"
+        
+        if [ -z "$ACR_NAME" ] || [ -z "$RESOURCE_GROUP" ] || [ -z "$APP_SERVICE" ]; then
+          echo "ERROR: Missing required environment variables"
+          exit 1
+        fi
+        
+        # Check if ACI already exists (reads from persisted azd env)
+        ACI_NAME=$(azd env get-value CONTAINER_INSTANCE_NAME 2>/dev/null || echo "")
+        
+        # ===== Build Backend Image (ACR Build) =====
+        echo ""
+        echo "===== Building Backend Image ====="
+        echo "Registry: $ACR_NAME"
+        echo "Image: $BACKEND_IMAGE:latest"
+        
+        if az acr build --registry "$ACR_NAME" --image "$BACKEND_IMAGE:latest" --file ./src/backend/ApiApp.Dockerfile ./src/backend; then
+          echo "Container image built and pushed successfully!"
+        else
+          echo "Failed to build container image"
+          exit 1
+        fi
+        
+        # ===== Deploy ACI if not already deployed =====
+        if [ -z "$ACI_NAME" ]; then
+          echo ""
+          echo "===== Deploying Container Instance ====="
+          azd env set AZURE_ENV_IMAGE_TAG latest
+          
+          # Use az deployment instead of azd provision to avoid hook recursion
+          # Pass parameters inline (main.parameters.json uses AZD ${VAR} syntax not supported by az CLI)
+          echo "Deploying ACI via Bicep..."
+          if az deployment group create \
+            --resource-group "$RESOURCE_GROUP" \
+            --template-file ./infra/main.bicep \
+            --parameters solutionName="$AZURE_ENV_NAME" \
+            --parameters location="$AZURE_LOCATION" \
+            --parameters azureAiServiceLocation="$AZURE_ENV_AI_SERVICE_LOCATION" \
+            --parameters imageTag=latest \
+            --query "properties.outputs" -o json > /dev/null; then
+            # Refresh azd env with new outputs
+            azd env refresh --no-prompt 2>/dev/null
+            echo "Container Instance deployed successfully!"
+          else
+            echo "Container Instance deployment failed"
+          fi
+        else
+          echo ""
+          echo "Restarting Container Instance to pick up new image..."
+          az container restart --name "$ACI_NAME" --resource-group "$RESOURCE_GROUP" 2>/dev/null
+          echo "Container Instance: $ACI_NAME (restarted)"
+        fi
+        
+        echo ""
+        echo "===== Postprovision Complete - Frontend will deploy next ====="
+        
+        # Ensure postprovision exits successfully so frontend deploys
+        exit 0
+      interactive: true
+      continueOnError: false
+
+  postdeploy:
+    windows:
+      shell: pwsh
+      run: |
+        Write-Host "===== Running Post-Deploy Script =====" -ForegroundColor Yellow
+        $python = "python"
+        if (Test-Path "./.venv/Scripts/python.exe") { $python = "./.venv/Scripts/python.exe" }
+        & $python -m pip install -r ./scripts/requirements-post-deploy.txt --quiet 2>$null
+        
+        if (Test-Path "./scripts/post_deploy.py") {
+          & $python ./scripts/post_deploy.py --skip-tests
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Post-deploy script completed successfully!" -ForegroundColor Green
+          } else {
+            Write-Host "Post-deploy script completed with warnings" -ForegroundColor Yellow
+          }
+        }
+        
+        Write-Host ""
+        Write-Host "===== Deployment Complete =====" -ForegroundColor Green
+        Write-Host "Access the web application:" -ForegroundColor White
+        Write-Host "   $env:WEB_APP_URL" -ForegroundColor Cyan
+      interactive: true
+      continueOnError: false
+
+    posix:
+      shell: sh
+      run: |
+        echo "===== Running Post-Deploy Script ====="
+        PYTHON="python3"
+        if [ -f "./.venv/bin/python" ]; then PYTHON="./.venv/bin/python"; fi
+        $PYTHON -m pip install -r ./scripts/requirements-post-deploy.txt --quiet 2>/dev/null
+        
+        if [ -f "./scripts/post_deploy.py" ]; then
+          $PYTHON ./scripts/post_deploy.py --skip-tests \
+            && echo "Post-deploy script completed successfully!" \
+            || echo "Post-deploy script completed with warnings"
+        fi
+        
+        echo ""
+        echo "===== Deployment Complete ====="
+        echo "Access the web application:"
+        echo "   $WEB_APP_URL"
+      interactive: true
+      continueOnError: false

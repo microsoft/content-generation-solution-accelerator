@@ -40,12 +40,12 @@ $ProjectDir = Split-Path -Parent $ScriptDir
 Set-Location $ProjectDir
 
 # Configuration from environment or prompt
-$ResourceGroup = if ($env:RESOURCE_GROUP) { $env:RESOURCE_GROUP } else { $null }
-$Location = if ($env:LOCATION) { $env:LOCATION } else { "eastus" }
-$AcrName = if ($env:ACR_NAME) { $env:ACR_NAME } else { $null }
-$ContainerName = if ($env:CONTAINER_NAME) { $env:CONTAINER_NAME } else { "aci-contentgen-backend" }
+$ResourceGroup = if ($env:AZURE_RESOURCE_GROUP) { $env:AZURE_RESOURCE_GROUP } else { $null }
+$Location = if ($env:AZURE_LOCATION) { $env:AZURE_LOCATION } else { "eastus" }
+$AcrName = if ($env:AZURE_ENV_CONTAINER_REGISTRY_NAME) { $env:AZURE_ENV_CONTAINER_REGISTRY_NAME } else { $null }
+$ContainerName = if ($env:CONTAINER_INSTANCE_NAME) { $env:CONTAINER_INSTANCE_NAME } else { "aci-contentgen-backend" }
 $AppServiceName = if ($env:APP_SERVICE_NAME) { $env:APP_SERVICE_NAME } else { $null }
-$ImageTag = if ($env:IMAGE_TAG) { $env:IMAGE_TAG } else { "latest" }
+$ImageTag = if ($env:AZURE_ENV_IMAGE_TAG) { $env:AZURE_ENV_IMAGE_TAG } else { "latest" }
 
 Write-Host ""
 Write-Host "Current configuration:"
@@ -96,7 +96,7 @@ if ($continue -eq "y" -or $continue -eq "Y") {
     Write-Host "Step 1: Building and pushing backend container..." -ForegroundColor Green
     Write-Host "==========================================" -ForegroundColor Green
     
-    Set-Location "$ProjectDir\src"
+    Set-Location "$ProjectDir\src\backend"
     
     # Login to ACR
     az acr login --name $AcrName
@@ -105,7 +105,7 @@ if ($continue -eq "y" -or $continue -eq "Y") {
     az acr build `
         --registry $AcrName `
         --image "contentgen-backend:$ImageTag" `
-        --file WebApp.Dockerfile `
+        --file ApiApp.Dockerfile `
         .
     
     Write-Host "✓ Container built and pushed to $AcrName.azurecr.io/contentgen-backend:$ImageTag" -ForegroundColor Green

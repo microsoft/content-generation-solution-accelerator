@@ -74,7 +74,7 @@ async def generate_image(
     """
     Generate a marketing image using DALL-E 3, gpt-image-1-mini, or gpt-image-1.5.
 
-    The model used is determined by AZURE_OPENAI_IMAGE_MODEL setting.
+    The model used is determined by AZURE_ENV_IMAGE_MODEL_NAME setting.
 
     Args:
         prompt: The main image generation prompt

@@ -244,25 +244,31 @@ def get_api_headers(config: ResourceConfig) -> Dict[str, str]:
     return headers
 
 
-async def check_admin_api_health(config: ResourceConfig) -> bool:
-    """Check if the admin API is available."""
+async def check_admin_api_health(config: ResourceConfig, max_retries: int = 5, retry_delay: int = 10) -> bool:
+    """Check if the admin API is available with retry logic for cold starts."""
     print_step("Checking admin API health...")
     
     async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
-            response = await client.get(
-                f"{config.app_url}/api/admin/health",
-                headers=get_api_headers(config)
-            )
-            if response.status_code == 200:
-                print_success("Admin API is healthy")
-                return True
-            else:
-                print_error(f"Admin API returned {response.status_code}")
-                return False
-        except Exception as e:
-            print_error(f"Failed to reach admin API: {e}")
-            return False
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = await client.get(
+                    f"{config.app_url}/api/admin/health",
+                    headers=get_api_headers(config)
+                )
+                if response.status_code == 200:
+                    print_success("Admin API is healthy")
+                    return True
+                else:
+                    print_warning(f"Attempt {attempt}/{max_retries}: Admin API returned {response.status_code}")
+            except Exception as e:
+                print_warning(f"Attempt {attempt}/{max_retries}: Failed to reach admin API: {e}")
+            
+            if attempt < max_retries:
+                print(f"  Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+        
+        print_error(f"Admin API not available after {max_retries} attempts")
+        return False
 
 
 async def upload_images(config: ResourceConfig, dry_run: bool = False) -> int:

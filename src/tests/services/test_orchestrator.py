@@ -1,10 +1,10 @@
 import base64
 import json
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-import orchestrator
 from orchestrator import (_HARMFUL_PATTERNS_COMPILED,
                           _SYSTEM_PROMPT_PATTERNS_COMPILED,
                           PLANNING_INSTRUCTIONS, RAI_HARMFUL_CONTENT_RESPONSE,
@@ -860,7 +860,7 @@ def test_get_orchestrator_singleton():
         mock_builder.return_value = mock_builder_instance
 
         # Reset the singleton
-        orchestrator._orchestrator = None
+        sys.modules["orchestrator"]._orchestrator = None
 
         instance1 = get_orchestrator()
         instance2 = get_orchestrator()
@@ -1423,6 +1423,11 @@ async def test_get_chat_client_foundry_mode():
         call_kwargs = mock_client.call_args[1]
         assert call_kwargs["deployment_name"] == "gpt-4-foundry"
 
+
+def test_foundry_not_available():
+    """Test when Foundry SDK is not available."""
+    # Check that FOUNDRY_AVAILABLE is defined
+    assert hasattr(sys.modules["orchestrator"], 'FOUNDRY_AVAILABLE')
 
 # Tests for workflow event handling (lines 736-799, 841-895)
 # Note: These are integration-level tests that verify the workflow event

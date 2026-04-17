@@ -16,6 +16,8 @@ Check the [Azure Products by Region](https://azure.microsoft.com/en-us/explore/g
 
 Here are some example regions where the services are available: East US, East US2, Australia East, UK South, France Central.
 
+> **Note**: Some tenants may have additional security restrictions that run periodically and could impact the application (e.g., blocking public network access). If you experience issues or the application stops working, check if these restrictions are the cause. In such cases, consider deploying the WAF-supported version to ensure compliance. To configure, [Click here](./AZD_DEPLOYMENT.md#3-choose-deployment-configuration).
+
 ### **Important Note for PowerShell Users**
 
 If you encounter issues running PowerShell scripts due to the policy of not being digitally signed, you can temporarily adjust the `ExecutionPolicy` by running the following command in an elevated PowerShell session:
@@ -218,7 +220,7 @@ az webapp config set -g $RESOURCE_GROUP -n <app-name> --http20-enabled false
 
 **Solution**: 
 1. Verify GPT-Image-1-mini or GPT-Image-1.5 deployment exists in Azure OpenAI resource
-2. Check `AZURE_OPENAI_IMAGE_MODEL` and `AZURE_OPENAI_GPT_IMAGE_ENDPOINT` environment variables
+2. Check `AZURE_ENV_IMAGE_MODEL_NAME` and `AZURE_OPENAI_GPT_IMAGE_ENDPOINT` environment variables
 
 </details>
 

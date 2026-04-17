@@ -9,12 +9,12 @@
 # Auto-detects mode based on environment variables.
 #
 # Usage (local):
-#   bash checkquota.sh [image_model_choice]
+#   bash checkquota.sh [model]   # e.g. gpt-image-1-mini | gpt-image-1.5 | none
 #   bash checkquota.sh gpt-image-1-mini
 #   bash checkquota.sh none
 #
 # Usage (CI - via env vars):
-#   Set AZURE_SUBSCRIPTION_ID, GPT_MIN_CAPACITY, AZURE_REGIONS, IMAGE_MODEL_CHOICE
+#   Set AZURE_SUBSCRIPTION_ID, GPT_MIN_CAPACITY, AZURE_REGIONS, AZURE_ENV_IMAGE_MODEL_NAME
 #   Authentication is handled externally via OIDC (az login already done before this script runs)
 # =============================================================================
 
@@ -28,9 +28,9 @@ fi
 # ---- Configuration ----
 # In local mode, image model can be passed as first argument
 if [[ "$RUN_MODE" == "local" ]]; then
-    IMAGE_MODEL_CHOICE="${1:-${IMAGE_MODEL_CHOICE:-gpt-image-1-mini}}"
+    AZURE_ENV_IMAGE_MODEL_NAME="${1:-${AZURE_ENV_IMAGE_MODEL_NAME:-gpt-image-1-mini}}"
 else
-    IMAGE_MODEL_CHOICE="${IMAGE_MODEL_CHOICE:-gpt-image-1-mini}"
+    AZURE_ENV_IMAGE_MODEL_NAME="${AZURE_ENV_IMAGE_MODEL_NAME:-gpt-image-1-mini}"
 fi
 
 GPT_MIN_CAPACITY="${GPT_MIN_CAPACITY:-150}"
@@ -40,7 +40,7 @@ IMAGE_MODEL_MIN_CAPACITY="${IMAGE_MODEL_MIN_CAPACITY:-1}"
 if [[ -n "$AZURE_REGIONS" ]]; then
     IFS=', ' read -ra REGIONS <<< "$AZURE_REGIONS"
 else
-    REGIONS=("westus3" "eastus2" "uaenorth" "swedencentral" "australiaeast" "eastus" "uksouth" "japaneast")
+    REGIONS=("westus3" "eastus2" "uaenorth" "swedencentral" "australiaeast" "uksouth" "japaneast" "canadaeast" "koreacentral" "polandcentral" "switzerlandnorth")
 fi
 
 # Map image model choice to Azure quota model name
@@ -53,8 +53,8 @@ IMAGE_MODEL_QUOTA_NAME=(
 
 # ---- Validate image model choice ----
 ALLOWED_MODELS=("gpt-image-1-mini" "gpt-image-1.5" "none")
-if [[ ! " ${ALLOWED_MODELS[@]} " =~ " ${IMAGE_MODEL_CHOICE} " ]]; then
-    echo "❌ ERROR: Invalid image model choice: '$IMAGE_MODEL_CHOICE'"
+if [[ ! " ${ALLOWED_MODELS[@]} " =~ " ${AZURE_ENV_IMAGE_MODEL_NAME} " ]]; then
+    echo "❌ ERROR: Invalid image model choice: '$AZURE_ENV_IMAGE_MODEL_NAME'"
     echo "   Allowed values: ${ALLOWED_MODELS[*]}"
     exit 1
 fi
@@ -91,7 +91,7 @@ fi
 echo ""
 echo "📋 Configuration:"
 echo "   Mode: $RUN_MODE"
-echo "   Image Model Choice: $IMAGE_MODEL_CHOICE"
+echo "   Image Model Choice: $AZURE_ENV_IMAGE_MODEL_NAME"
 echo "   GPT Min Capacity: $GPT_MIN_CAPACITY"
 echo "   Image Model Min Capacity: $IMAGE_MODEL_MIN_CAPACITY"
 echo "   Regions to check: ${REGIONS[*]}"
@@ -104,10 +104,10 @@ MIN_CAPACITY=(
 )
 
 # Add image model to quota check if not 'none'
-IMAGE_QUOTA_NAME="${IMAGE_MODEL_QUOTA_NAME[$IMAGE_MODEL_CHOICE]}"
+IMAGE_QUOTA_NAME="${IMAGE_MODEL_QUOTA_NAME[$AZURE_ENV_IMAGE_MODEL_NAME]}"
 if [[ -n "$IMAGE_QUOTA_NAME" ]]; then
     MIN_CAPACITY["$IMAGE_QUOTA_NAME"]=$IMAGE_MODEL_MIN_CAPACITY
-    echo "🖼️  Image model '$IMAGE_MODEL_CHOICE' added to quota check (key: $IMAGE_QUOTA_NAME, min capacity: $IMAGE_MODEL_MIN_CAPACITY)"
+    echo "🖼️  Image model '$AZURE_ENV_IMAGE_MODEL_NAME' added to quota check (key: $IMAGE_QUOTA_NAME, min capacity: $IMAGE_MODEL_MIN_CAPACITY)"
 else
     echo "ℹ️  Image model set to 'none' — skipping image model quota check."
 fi
@@ -170,7 +170,7 @@ echo ""
 echo "========================================"
 if [ -z "$VALID_REGION" ]; then
     echo "❌ No region with sufficient quota found!"
-    echo "   Image Model: $IMAGE_MODEL_CHOICE"
+    echo "   Image Model: $AZURE_ENV_IMAGE_MODEL_NAME"
     echo "   Checked regions: ${REGIONS[*]}"
 
     # In CI mode, set GITHUB_ENV variable instead of exiting with error

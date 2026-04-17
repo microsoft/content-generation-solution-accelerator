@@ -10,19 +10,27 @@ By default this template will use the environment name as the prefix to prevent 
 | -------------------------------------- | ------- | ---------------------------- | ----------------------------------------------------------------------------- |
 | `AZURE_LOCATION`                       | string  | `<User selects during deployment>` | Sets the Azure region for resource deployment. Allowed: `australiaeast`, `centralus`, `eastasia`, `eastus`, `eastus2`, `japaneast`, `northeurope`, `southeastasia`, `swedencentral`, `uksouth`, `westus`, `westus3`. |
 | `AZURE_ENV_NAME`                       | string  | `contentgen`               | Sets the environment name prefix for all Azure resources (3-15 characters).   |
-| `SECONDARY_LOCATION`                   | string  | `uksouth`                  | Specifies a secondary Azure region for database creation.                     |
-| `AZURE_OPENAI_GPT_MODEL`              | string  | `gpt-5.1`                 | Specifies the GPT model name to deploy.                                       |
-| `GPT_MODEL_VERSION`                    | string  | `2025-11-13`               | Sets the GPT model version.                                                   |
-| `GPT_MODEL_DEPLOYMENT_TYPE`            | string  | `GlobalStandard`           | Defines the model deployment type (allowed: `Standard`, `GlobalStandard`).    |
-| `GPT_MODEL_CAPACITY`                   | integer | `150`                      | Sets the GPT model token capacity (minimum: `10`).                            |
-| `AZURE_OPENAI_IMAGE_MODEL`             | string  | `gpt-image-1-mini`         | Image model to deploy (allowed: `gpt-image-1-mini`, `gpt-image-1.5`, `none`). |
-| `IMAGE_MODEL_CAPACITY`                 | integer | `1`                        | Sets the image model deployment capacity in RPM (minimum: `1`).               |
-| `AZURE_OPENAI_API_VERSION`             | string  | `2025-01-01-preview`       | Specifies the API version for Azure OpenAI service.                           |
-| `AZURE_ENV_OPENAI_LOCATION`           | string  | `<User selects during deployment>` | Sets the Azure region for OpenAI resource deployment.                         |
-| `AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID` | string  | `""`                       | Reuses an existing Log Analytics Workspace instead of creating a new one.     |
-| `AZURE_EXISTING_AI_PROJECT_RESOURCE_ID`| string  | `""`                       | Reuses an existing AI Foundry Project instead of creating a new one.          |
-| `ACR_NAME`                             | string  | `contentgencontainerreg`   | Sets the existing Azure Container Registry name (without `.azurecr.io`).      |
-| `IMAGE_TAG`                            | string  | `latest`                   | Sets the container image tag (e.g., `latest`, `dev`, `hotfix`).               |
+| `AZURE_ENV_SECONDARY_LOCATION`                   | string  | `uksouth`                  | Specifies a secondary Azure region for database creation.                     |
+| `AZURE_ENV_GPT_MODEL_NAME`              | string  | `gpt-5.1`                 | Specifies the GPT model name to deploy.                                       |
+| `AZURE_ENV_GPT_MODEL_VERSION`                    | string  | `2025-11-13`               | Sets the GPT model version.                                                   |
+| `AZURE_ENV_MODEL_DEPLOYMENT_TYPE`            | string  | `GlobalStandard`           | Defines the model deployment type (allowed: `Standard`, `GlobalStandard`).    |
+| `AZURE_ENV_GPT_MODEL_CAPACITY`                   | integer | `150`                      | Sets the GPT model token capacity (minimum: `10`).                            |
+| `AZURE_ENV_IMAGE_MODEL_NAME`           | string  | `gpt-image-1-mini`         | Image model to deploy (allowed: `gpt-image-1-mini`, `gpt-image-1.5`, `none`). |
+| `AZURE_ENV_IMAGE_MODEL_CAPACITY`       | integer | `1`                        | Sets the image model deployment capacity in RPM (minimum: `1`).               |
+| `AZURE_ENV_OPENAI_API_VERSION`            | string  | `2025-01-01-preview`       | Specifies the API version for Azure OpenAI service.                           |
+| `AZURE_ENV_AI_SERVICE_LOCATION`           | string  | `<User selects during deployment>` | Sets the Azure region for OpenAI resource deployment. Allowed: `australiaeast`, `canadaeast`, `eastus2`, `japaneast`, `koreacentral`, `polandcentral`, `swedencentral`, `switzerlandnorth`, `uaenorth`, `uksouth`, `westus3`. |
+| `AZURE_ENV_EXISTING_LOG_ANALYTICS_WORKSPACE_RID`   | string  | `""`                       | Reuses an existing Log Analytics Workspace instead of creating a new one.     |
+| `AZURE_EXISTING_AIPROJECT_RESOURCE_ID`           | string  | `""`                       | Reuses an existing AI Foundry Project instead of creating a new one.          |
+| `enableMonitoring`                     | boolean | `false`                    | Enable Log Analytics and Application Insights (WAF-aligned).                  |
+| `enableScalability`                    | boolean | `false`                    | Enable auto-scaling and higher SKUs (WAF-aligned).                            |
+| `enableRedundancy`                     | boolean | `false`                    | Enable zone redundancy and geo-replication (WAF-aligned).                     |
+| `enablePrivateNetworking`              | boolean | `false`                    | Enable VNet integration and private endpoints (WAF-aligned).                  |
+| `deployBastionAndJumpbox`              | boolean | `false`                    | Deploy Azure Bastion and jumpbox admin-path resources when private networking is enabled. |
+| `AZURE_ENV_VM_SIZE`                    | string  | `""`                       | Overrides the jumpbox VM size (private networking only). Must support accelerated networking and Premium SSD. |
+| `AZURE_ENV_VM_ADMIN_USERNAME`          | string  | `""`                       | Sets the jumpbox VM admin username (private networking only).                 |
+| `AZURE_ENV_VM_ADMIN_PASSWORD`          | string  | `""`                       | Sets the jumpbox VM admin password. Bastion and jumpbox resources are deployed only when this is set and `deployBastionAndJumpbox=true`. |
+| `AZURE_ENV_CONTAINER_REGISTRY_NAME`       | string  | `contentgencontainerreg`   | Sets the existing Azure Container Registry name (without `.azurecr.io`).      |
+| `AZURE_ENV_IMAGE_TAG`                     | string  | `latest`                   | Sets the container image tag (e.g., `latest`, `dev`, `hotfix`).               |
 
 ## How to Set a Parameter
 
@@ -36,8 +44,8 @@ azd env set <PARAMETER_NAME> <VALUE>
 
 ```bash
 azd env set AZURE_LOCATION westus2
-azd env set AZURE_OPENAI_GPT_MODEL gpt-5.1
-azd env set GPT_MODEL_DEPLOYMENT_TYPE Standard
-azd env set AZURE_OPENAI_IMAGE_MODEL gpt-image-1-mini
-azd env set ACR_NAME contentgencontainerreg
+azd env set AZURE_ENV_GPT_MODEL_NAME gpt-5.1
+azd env set AZURE_ENV_MODEL_DEPLOYMENT_TYPE Standard
+azd env set AZURE_ENV_IMAGE_MODEL_NAME gpt-image-1-mini
+azd env set AZURE_ENV_CONTAINER_REGISTRY_NAME contentgencontainerreg
 ```

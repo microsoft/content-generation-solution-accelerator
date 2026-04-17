@@ -124,14 +124,14 @@ This single command will:
 
 ```bash
 # Set the resource ID of your existing AI Project
-azd env set AZURE_EXISTING_AI_PROJECT_RESOURCE_ID "/subscriptions/<sub-id>/resourceGroups/<rg>/providers/Microsoft.MachineLearningServices/workspaces/<project-name>"
+azd env set AZURE_EXISTING_AIPROJECT_RESOURCE_ID "/subscriptions/<sub-id>/resourceGroups/<rg>/providers/Microsoft.MachineLearningServices/workspaces/<project-name>"
 ```
 
 ### Reuse Existing Log Analytics Workspace
 
 ```bash
 # Set the resource ID of your existing Log Analytics workspace
-azd env set AZURE_ENV_LOG_ANALYTICS_WORKSPACE_ID "/subscriptions/<sub-id>/resourceGroups/<rg>/providers/Microsoft.OperationalInsights/workspaces/<workspace-name>"
+azd env set AZURE_ENV_EXISTING_LOG_ANALYTICS_WORKSPACE_RID "/subscriptions/<sub-id>/resourceGroups/<rg>/providers/Microsoft.OperationalInsights/workspaces/<workspace-name>"
 ```
 
 ## Post-Deployment
@@ -227,7 +227,7 @@ Error: The model 'gpt-4o' is not available in region 'westeurope'
 
 **Solution**: Set a different region for AI Services:
 ```bash
-azd env set AZURE_ENV_OPENAI_LOCATION eastus
+azd env set AZURE_ENV_AI_SERVICE_LOCATION eastus2
 ```
 
 #### 3. Container Build Fails
@@ -309,8 +309,39 @@ When `enablePrivateNetworking` is enabled:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+## Advanced: Deploy Local Changes
+
+If you've made local modifications to the code and want to deploy them to Azure, follow these steps to swap the configuration files:
+
+> **Note**: To set up and run the application locally for development, see the [Local Development Guide](LocalDevelopmentSetup.md).
+
+### Step 1: Rename Azure Configuration Files
+
+In the root directory:
+
+1. Rename `azure.yaml` to `azure_custom2.yaml`
+2. Rename `azure_custom.yaml` to `azure.yaml`
+
+### Step 2: Rename Infrastructure Files
+
+In the `infra` directory:
+
+1. Rename `main.bicep` to `main_custom2.bicep`
+2. Rename `main_custom.bicep` to `main.bicep`
+
+### Step 3: Deploy Changes
+
+Run the deployment command:
+
+```bash
+azd up
+```
+
+> **Note**: These custom files are configured to deploy your local code changes instead of pulling from the GitHub repository.
+
 ## Related Documentation
 
 - [Deployment Guide](DEPLOYMENT.md)
+- [Local Development Guide](LocalDevelopmentSetup.md)
 - [Image Generation Configuration](IMAGE_GENERATION.md)
 - [Azure Developer CLI Documentation](https://learn.microsoft.com/azure/developer/azure-developer-cli/)

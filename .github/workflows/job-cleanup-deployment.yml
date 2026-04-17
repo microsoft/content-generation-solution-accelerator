@@ -28,7 +28,7 @@ on:
         description: 'Azure Location'
         required: true
         type: string
-      AZURE_ENV_OPENAI_LOCATION:
+      AZURE_ENV_AI_SERVICE_LOCATION:
         description: 'Azure OpenAI Location'
         required: true
         type: string
@@ -36,7 +36,7 @@ on:
         description: 'Environment Name'
         required: true
         type: string
-      IMAGE_TAG:
+      AZURE_ENV_IMAGE_TAG:
         description: 'Docker Image Tag'
         required: true
         type: string
@@ -49,9 +49,9 @@ jobs:
     env:
       RESOURCE_GROUP_NAME: ${{ inputs.RESOURCE_GROUP_NAME }}
       AZURE_LOCATION: ${{ inputs.AZURE_LOCATION }}
-      AZURE_ENV_OPENAI_LOCATION: ${{ inputs.AZURE_ENV_OPENAI_LOCATION }}
+      AZURE_ENV_AI_SERVICE_LOCATION: ${{ inputs.AZURE_ENV_AI_SERVICE_LOCATION }}
       ENV_NAME: ${{ inputs.ENV_NAME }}
-      IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+      AZURE_ENV_IMAGE_TAG: ${{ inputs.AZURE_ENV_IMAGE_TAG }}
     steps:
       - name: Login to Azure (OIDC)
         uses: azure/login@v2

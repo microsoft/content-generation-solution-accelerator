@@ -8,9 +8,9 @@ complete marketing content packages including text and images.
 Prerequisites:
 1. Set up environment variables (or use a .env file):
    - AZURE_OPENAI_ENDPOINT: Your Azure OpenAI endpoint
-   - AZURE_OPENAI_GPT_MODEL: GPT model deployment name
+   - AZURE_ENV_GPT_MODEL_NAME: GPT model deployment name
    - AZURE_OPENAI_GPT_IMAGE_ENDPOINT: (Optional) Endpoint for images
-   - AZURE_OPENAI_IMAGE_MODEL: Image model name (e.g., gpt-image-1-mini)
+   - AZURE_ENV_IMAGE_MODEL_NAME: Image model name (e.g., gpt-image-1-mini)
    - AZURE_COSMOS_ENDPOINT: Your CosmosDB endpoint
    - AZURE_COSMOS_DATABASE_NAME: content-generation
    - AZURE_COSMOS_CONVERSATIONS_CONTAINER: conversations

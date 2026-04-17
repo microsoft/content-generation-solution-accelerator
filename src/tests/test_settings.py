@@ -78,10 +78,45 @@ class TestAzureOpenAIImageProperties:
 
         with patch.dict(os.environ, {
             "AZURE_OPENAI_ENDPOINT": "https://test.openai.azure.com",
-            "AZURE_OPENAI_IMAGE_MODEL": "gpt-image-1.5"
+            "AZURE_ENV_IMAGE_MODEL_NAME": "gpt-image-1.5"
         }, clear=False):
             settings = _AzureOpenAISettings()
             assert settings.effective_image_model == "gpt-image-1.5"
+
+    def test_image_model_with_legacy_env_var(self):
+        """Test image_model loads from legacy AZURE_OPENAI_IMAGE_MODEL variable."""
+        from settings import _AzureOpenAISettings
+
+        with patch.dict(os.environ, {
+            "AZURE_OPENAI_ENDPOINT": "https://test.openai.azure.com",
+            "AZURE_OPENAI_IMAGE_MODEL": "gpt-image-1.5"
+        }, clear=False):
+            settings = _AzureOpenAISettings()
+            assert settings.image_model == "gpt-image-1.5"
+            assert settings.effective_image_model == "gpt-image-1.5"
+
+    def test_gpt_model_with_legacy_env_var(self):
+        """Test gpt_model loads from legacy AZURE_OPENAI_GPT_MODEL variable."""
+        from settings import _AzureOpenAISettings
+
+        with patch.dict(os.environ, {
+            "AZURE_OPENAI_ENDPOINT": "https://test.openai.azure.com",
+            "AZURE_OPENAI_GPT_MODEL": "gpt-4o"
+        }, clear=False):
+            settings = _AzureOpenAISettings()
+            assert settings.gpt_model == "gpt-4o"
+
+    def test_api_version_with_legacy_env_var(self):
+        """Test api_version loads from legacy AZURE_OPENAI_API_VERSION variable."""
+        from settings import _AzureOpenAISettings
+
+        with patch.dict(os.environ, {
+            "AZURE_OPENAI_ENDPOINT": "https://test.openai.azure.com",
+            "AZURE_OPENAI_API_VERSION": "2023-12-01-preview",
+            "AZURE_ENV_OPENAI_API_VERSION": ""  # Clear new env var to test legacy
+        }, clear=False):
+            settings = _AzureOpenAISettings()
+            assert settings.api_version == "2023-12-01-preview"
 
 
 class TestImageGenerationEnabled:
@@ -93,7 +128,7 @@ class TestImageGenerationEnabled:
 
         with patch.dict(os.environ, {
             "AZURE_OPENAI_ENDPOINT": "https://test.openai.azure.com",
-            "AZURE_OPENAI_IMAGE_MODEL": "none"
+            "AZURE_ENV_IMAGE_MODEL_NAME": "none"
         }, clear=False):
             settings = _AzureOpenAISettings()
             assert settings.image_generation_enabled is False
@@ -104,7 +139,7 @@ class TestImageGenerationEnabled:
 
         with patch.dict(os.environ, {
             "AZURE_OPENAI_ENDPOINT": "https://test.openai.azure.com",
-            "AZURE_OPENAI_IMAGE_MODEL": "disabled"
+            "AZURE_ENV_IMAGE_MODEL_NAME": "disabled"
         }, clear=False):
             settings = _AzureOpenAISettings()
             assert settings.image_generation_enabled is False
@@ -115,7 +150,7 @@ class TestImageGenerationEnabled:
 
         with patch.dict(os.environ, {
             "AZURE_OPENAI_ENDPOINT": "https://test.openai.azure.com",
-            "AZURE_OPENAI_IMAGE_MODEL": "gpt-image-1-mini"
+            "AZURE_ENV_IMAGE_MODEL_NAME": "gpt-image-1-mini"
         }, clear=False):
             settings = _AzureOpenAISettings()
             assert settings.image_generation_enabled is True
