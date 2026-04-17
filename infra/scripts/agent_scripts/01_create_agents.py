@@ -26,6 +26,8 @@ Usage:
 
 import argparse
 import asyncio
+import re
+import subprocess
 
 from azure.ai.projects.aio import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition
@@ -326,15 +328,32 @@ async def main():
         created_agents[key] = agent
         print(f"  Created: {agent.name} (id={agent.id})")
 
-    # Print output variables for downstream configuration
-    print()
-    print("===== Agent Names (set as environment variables) =====")
+    # Persist agent names to azd environment
     for key, agent in created_agents.items():
         env_key = f"AGENT_NAME_{key.upper()}"
-        print(f"{env_key}={agent.name}")
+        persist_to_azd_env(env_key, agent.name)
 
     await credential.close()
     await project_client.close()
+
+
+def persist_to_azd_env(key: str, value: str) -> bool:
+    """Persist a key-value pair to the azd environment."""
+    if not re.match(r'^[A-Z][A-Z0-9_]*$', key):
+        return False
+    if any(c in value for c in ['\x00', '\n', '\r']):
+        return False
+    try:
+        result = subprocess.run(
+            ["azd", "env", "set", key, value],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 
 if __name__ == "__main__":

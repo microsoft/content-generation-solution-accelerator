@@ -308,6 +308,15 @@ The `.env` file is loaded from the repository root. It is **auto-generated** whe
 | `AZURE_AI_IMAGE_MODEL_DEPLOYMENT` | Yes | Image model deployment name in Foundry |
 | `AI_FOUNDRY_RESOURCE_ID` | Yes | Resource ID of the AI Foundry account (used for role assignments) |
 | `AZURE_EXISTING_AIPROJECT_RESOURCE_ID` | No | Resource ID of an existing AI project (used for role assignments if set) |
+| `AZURE_AI_SOLUTION_NAME` | No | Solution name suffix used for agent naming (auto-set by deployment) |
+| `AGENT_NAME_TRIAGE` | No | Triage agent name (auto-derived from `AZURE_AI_SOLUTION_NAME` if blank) |
+| `AGENT_NAME_PLANNING` | No | Planning agent name (auto-derived if blank) |
+| `AGENT_NAME_RESEARCH` | No | Research agent name (auto-derived if blank) |
+| `AGENT_NAME_TEXT_CONTENT` | No | Text content agent name (auto-derived if blank) |
+| `AGENT_NAME_IMAGE_CONTENT` | No | Image content agent name (auto-derived if blank) |
+| `AGENT_NAME_COMPLIANCE` | No | Compliance agent name (auto-derived if blank) |
+| `AGENT_NAME_RAI` | No | RAI agent name (auto-derived if blank) |
+| `AGENT_NAME_TITLE` | No | Title agent name (auto-derived if blank) |
 
 ### Azure Cosmos DB
 

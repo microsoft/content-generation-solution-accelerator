@@ -1086,6 +1086,9 @@ resource containerInstance 'Microsoft.ContainerInstance/containerGroups@2025-09-
             { name: 'AZURE_AI_PROJECT_ENDPOINT', value: aiFoundryAiProjectEndpoint }
             { name: 'AZURE_AI_MODEL_DEPLOYMENT_NAME', value: gptModelName }
             { name: 'AZURE_AI_IMAGE_MODEL_DEPLOYMENT', value: imageModelConfig[imageModelChoice].name }
+            { name: 'AZURE_AI_SOLUTION_NAME', value: solutionSuffix }
+            // Note: Agent name env vars (AGENT_NAME_*) are injected by the
+            // postdeploy hook ONLY after successful agent creation — see azure_custom.yaml
             // Logging Settings
             { name: 'AZURE_BASIC_LOGGING_LEVEL', value: 'INFO' }
             { name: 'AZURE_PACKAGE_LOGGING_LEVEL', value: 'WARNING' }
@@ -1234,6 +1237,9 @@ output AZURE_AI_MODEL_DEPLOYMENT_NAME string = gptModelName
 
 @description('Contains Azure AI Image Model Deployment Name (empty if none selected)')
 output AZURE_AI_IMAGE_MODEL_DEPLOYMENT string = imageModelConfig[imageModelChoice].name
+
+@description('Contains solution suffix used for agent naming')
+output AZURE_AI_SOLUTION_NAME string = solutionSuffix
 
 @description('Contains Managed Identity Client ID')
 output AZURE_CLIENT_ID string = userAssignedIdentity.outputs.clientId
