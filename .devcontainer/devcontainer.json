@@ -1,40 +1,46 @@
 {
-    "name": "azd-template",
-    "build": {
-        "dockerfile": "Dockerfile"
+  "name": "azd-template",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "forwardPorts": [
+    3000,
+    5000
+  ],
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "nodeGypDependencies": true,
+      "installYarnUsingApt": true,
+      "version": "lts",
+      "pnpmVersion": "latest",
+      "nvmVersion": "latest"
     },
-    "forwardPorts": [3000, 5000],
-    "features": {
-        "ghcr.io/devcontainers/features/node:1": {
-            "nodeGypDependencies": true,
-            "installYarnUsingApt": true,
-            "version": "lts",
-            "pnpmVersion": "latest",
-            "nvmVersion": "latest"
-        },
-        "ghcr.io/devcontainers/features/azure-cli:1": {
-            "installBicep": true,
-            "version": "latest",
-            "bicepVersion": "latest"
-        },
-        "ghcr.io/azure/azure-dev/azd:0": {
-            "version": "stable"
-        }
+    "ghcr.io/devcontainers/features/azure-cli:1": {
+      "installBicep": true,
+      "version": "latest",
+      "bicepVersion": "latest"
     },
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "ms-azuretools.azure-dev",
-                "ms-azuretools.vscode-bicep",
-                "ms-python.python",
-                "ms-toolsai.jupyter",
-                "GitHub.vscode-github-actions"
-            ]
-        }
+    "ghcr.io/azure/azure-dev/azd:0": {
+      "version": "stable"
     },
-    "postCreateCommand": "bash ./.devcontainer/setup_env.sh",
-    "remoteUser": "vscode",
-    "hostRequirements": {
-        "memory": "4gb"
+    "ghcr.io/devcontainers/features/sshd:1": {
+      "version": "latest"
     }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.azure-dev",
+        "ms-azuretools.vscode-bicep",
+        "ms-python.python",
+        "ms-toolsai.jupyter",
+        "GitHub.vscode-github-actions"
+      ]
+    }
+  },
+  "postCreateCommand": "bash ./.devcontainer/setup_env.sh",
+  "remoteUser": "vscode",
+  "hostRequirements": {
+    "memory": "4gb"
+  }
 }
