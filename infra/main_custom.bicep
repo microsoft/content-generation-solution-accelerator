@@ -540,7 +540,7 @@ var dnsZoneIndex = {
 }
 
 @batchSize(5)
-module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.8.0' = [
+module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.8.1' = [
   for (zone, i) in privateDnsZones: if (enablePrivateNetworking) {
     name: take('avm.res.network.private-dns-zone.${replace(zone, '.', '-')}', 64)
     params: {
@@ -558,7 +558,7 @@ module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.8.0' = [
 ]
 
 // ========== AI Foundry: AI Services ========== //
-module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.14.1'  = if (!useExistingAiFoundryAiProject) {
+module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.14.2'  = if (!useExistingAiFoundryAiProject) {
   name: take('avm.res.cognitive-services.account.${aiFoundryAiServicesResourceName}', 64)
   params: {
     name: aiFoundryAiServicesResourceName
@@ -622,7 +622,7 @@ module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.14.1'
 }
 
 // Create private endpoint for AI Services AFTER the account is fully provisioned
-module aiServicesPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.11.1' = if (!useExistingAiFoundryAiProject && enablePrivateNetworking) {
+module aiServicesPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.0' = if (!useExistingAiFoundryAiProject && enablePrivateNetworking) {
   name: take('pep-ai-services-${aiFoundryAiServicesResourceName}', 64)
   params: {
     name: 'pep-${aiFoundryAiServicesResourceName}'
@@ -747,7 +747,7 @@ module aiSearch 'br/public:avm/res/search/search-service:0.12.0' = {
 }
 
 // ========== AI Search Connection to AI Services ========== //
-resource aiSearchFoundryConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-09-01' = if (!useExistingAiFoundryAiProject) {
+resource aiSearchFoundryConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-12-01' = if (!useExistingAiFoundryAiProject) {
   name: '${aiFoundryAiServicesResourceName}/${aiFoundryAiProjectResourceName}/${aiSearchConnectionName}'
   properties: {
     category: 'CognitiveSearch'
@@ -768,7 +768,7 @@ var productImagesContainer = 'product-images'
 var generatedImagesContainer = 'generated-images'
 var dataContainer = 'data'
 
-module storageAccount 'br/public:avm/res/storage/storage-account:0.31.1' = {
+module storageAccount 'br/public:avm/res/storage/storage-account:0.32.0' = {
   name: take('avm.res.storage.storage-account.${storageAccountName}', 64)
   params: {
     name: storageAccountName
@@ -836,7 +836,7 @@ var cosmosDBDatabaseName = 'content_generation_db'
 var cosmosDBConversationsContainer = 'conversations'
 var cosmosDBProductsContainer = 'products'
 
-module cosmosDB 'br/public:avm/res/document-db/database-account:0.18.0' = {
+module cosmosDB 'br/public:avm/res/document-db/database-account:0.19.0' = {
   name: take('avm.res.document-db.database-account.${cosmosDBResourceName}', 64)
   params: {
     name: 'cosmos-${solutionSuffix}'

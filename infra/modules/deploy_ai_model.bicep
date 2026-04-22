@@ -5,14 +5,14 @@ param aiServicesName string
 param deployments array = []
 
 // Reference AI Services account (module is scoped to the correct resource group)
-resource aiServices 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = {
+resource aiServices 'Microsoft.CognitiveServices/accounts@2025-12-01' existing = {
   name: aiServicesName
 }
 
 // Deploy models to AI Services account
 // Using batchSize(1) to avoid concurrent deployment issues
 @batchSize(1)
-resource modelDeployments 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = [
+resource modelDeployments 'Microsoft.CognitiveServices/accounts/deployments@2025-12-01' = [
   for (deployment, index) in deployments: {
     parent: aiServices
     name: deployment.name

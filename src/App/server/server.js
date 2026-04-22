@@ -56,7 +56,7 @@ app.use('/api', createProxyMiddleware({
 app.use(express.static(path.join(__dirname, 'static')));
 
 // Serve index.html for all other routes (SPA support)
-app.get('{*path}', (req, res) => {
+app.get('/{*path}', (req, res) => {
     res.sendFile(path.join(__dirname, 'static', 'index.html'));
 });
 
