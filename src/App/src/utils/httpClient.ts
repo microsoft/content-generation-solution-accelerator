@@ -70,7 +70,7 @@ class HttpClient {
     }
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
-      throw new Error(`${config.method || 'GET'} ${url} returned non-JSON response (${contentType})`);
+      throw new Error(`${config.method || 'GET'} ${url} returned non-JSON response`);
     }
     return response.json();
   }
