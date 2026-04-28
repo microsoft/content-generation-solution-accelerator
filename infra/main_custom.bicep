@@ -766,7 +766,7 @@ resource aiSearchFoundryConnection 'Microsoft.CognitiveServices/accounts/project
 var storageAccountName = 'st${solutionSuffix}'
 var productImagesContainer = 'product-images'
 var generatedImagesContainer = 'generated-images'
-var dataContainer = 'data'
+
 
 module storageAccount 'br/public:avm/res/storage/storage-account:0.32.0' = {
   name: take('avm.res.storage.storage-account.${storageAccountName}', 64)
@@ -792,10 +792,6 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.32.0' = {
         }
         {
           name: generatedImagesContainer
-          publicAccess: 'None'
-        }
-        {
-          name: dataContainer
           publicAccess: 'None'
         }
       ]
@@ -1157,11 +1153,7 @@ output AZURE_COSMOS_CONVERSATIONS_CONTAINER string = cosmosDBConversationsContai
 @description('Contains Resource Group Name')
 output RESOURCE_GROUP_NAME string = resourceGroup().name
 
-@description('Contains AI Foundry Name')
-output AI_FOUNDRY_NAME string = aiFoundryAiProjectResourceName
 
-@description('Contains AI Foundry RG Name')
-output AI_FOUNDRY_RG_NAME string = aiFoundryAiServicesResourceGroupName
 
 @description('Contains AI Foundry Resource ID')
 output AI_FOUNDRY_RESOURCE_ID string = useExistingAiFoundryAiProject ? '' : aiFoundryAiServices!.outputs.resourceId
@@ -1199,11 +1191,7 @@ output AZURE_ENV_OPENAI_API_VERSION string = azureOpenaiAPIVersion
 @description('Contains OpenAI Resource')
 output AZURE_OPENAI_RESOURCE string = aiFoundryAiServicesResourceName
 
-@description('Contains AI Agent Endpoint')
-output AZURE_AI_AGENT_ENDPOINT string = aiFoundryAiProjectEndpoint
 
-@description('Contains AI Agent API Version')
-output AZURE_AI_AGENT_API_VERSION string = azureAiAgentApiVersion
 
 @description('Contains Application Insights Connection String')
 output AZURE_APPLICATION_INSIGHTS_CONNECTION_STRING string = (enableMonitoring && !useExistingLogAnalytics) ? applicationInsights!.outputs.connectionString : ''
@@ -1214,8 +1202,7 @@ output AZURE_ENV_AI_SERVICE_LOCATION string = azureAiServiceLocation
 @description('Contains Container Instance Name')
 output CONTAINER_INSTANCE_NAME string = shouldDeployACI ? containerInstance!.name : ''
 
-@description('Contains Container Instance IP Address')
-output CONTAINER_INSTANCE_IP string = shouldDeployACI ? containerInstance!.properties.ipAddress.ip : ''
+
 
 @description('Contains Container Instance FQDN (only for non-private networking)')
 output CONTAINER_INSTANCE_FQDN string = (shouldDeployACI && !isPrivateNetworking) ? containerInstance!.properties.ipAddress.fqdn : ''
