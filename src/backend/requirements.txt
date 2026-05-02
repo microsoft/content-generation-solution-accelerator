@@ -7,7 +7,7 @@ hypercorn>=0.18.0
 
 # Microsoft Agent Framework
 agent-framework-azure-ai==1.0.0rc6
-agent-framework-core==1.2.1
+agent-framework-core==1.2.2
 
 # OpenTelemetry (required by agent-framework)
 opentelemetry-semantic-conventions-ai==0.5.1
@@ -16,12 +16,12 @@ opentelemetry-semantic-conventions-ai==0.5.1
 azure-identity>=1.25.3
 azure-cosmos>=4.15.0
 azure-storage-blob>=12.28.0
-azure-search-documents>=11.6.0
+azure-search-documents>=12.0.0
 azure-ai-contentsafety>=1.0.0
 azure-ai-projects==2.1.0  # Azure AI Foundry SDK (optional, for USE_FOUNDRY=true)
 
 # OpenAI
-openai>=2.32.0
+openai>=2.33.0
 
 # HTTP Client (for Foundry direct API calls)
 httpx>=0.28.1
