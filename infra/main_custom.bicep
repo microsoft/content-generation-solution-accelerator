@@ -369,6 +369,25 @@ module applicationInsights 'br/public:avm/res/insights/component:0.7.1' = if (en
   }
 }
 
+// ========== Token Usage Workbook ========== //
+// Provisions the "Token Usage" Application Insights workbook that visualises
+// LLM_Token_Usage_Summary / LLM_Agent_Token_Usage / LLM_Model_Token_Usage
+// custom events emitted by the orchestrator.
+// Template lives in infra/dashboards/token-usage-workbook.json.
+resource tokenUsageWorkbook 'Microsoft.Insights/workbooks@2023-06-01' = if (enableMonitoring) {
+  name: guid(resourceGroup().id, applicationInsightsResourceName, 'token-usage')
+  location: solutionLocation
+  tags: tags
+  kind: 'shared'
+  properties: {
+    displayName: 'Token Usage'
+    category: 'workbook'
+    sourceId: applicationInsights!.outputs.resourceId
+    version: 'Notebook/1.0'
+    serializedData: loadTextContent('dashboards/token-usage-workbook.json')
+  }
+}
+
 // ========== User Assigned Identity ========== //
 var userAssignedIdentityResourceName = 'id-${solutionSuffix}'
 module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.5.0' = {
@@ -1068,10 +1087,20 @@ resource aciTelemetry 'Microsoft.Resources/deployments@2025-04-01' = if (enableT
   }
 }
 
+// Hash that changes whenever the monitoring config is toggled.
+// Used as an ACI tag so that toggling enableMonitoring forces ARM to detect drift on the
+// container group, triggering a restart and re-applying env vars like
+// APPLICATIONINSIGHTS_CONNECTION_STRING. ACI does not natively support forceUpdateTag,
+// and tags must be calculatable at deployment-start (no runtime references allowed).
+var monitoringConfigHash = uniqueString(string(enableMonitoring))
+
 resource containerInstance 'Microsoft.ContainerInstance/containerGroups@2025-09-01' = if (shouldDeployACI) {
   name: containerInstanceName
   location: solutionLocation
-  tags: tags
+  tags: union(tags, {
+    'monitoring-enabled': string(enableMonitoring)
+    'monitoring-config-hash': monitoringConfigHash
+  })
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
