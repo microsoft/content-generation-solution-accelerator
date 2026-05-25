@@ -134,7 +134,7 @@
     },
     "gptModelCapacity": {
       "type": "int",
-      "defaultValue": 50,
+      "defaultValue": 150,
       "minValue": 10,
       "metadata": {
         "description": "Optional. AI model deployment token capacity."

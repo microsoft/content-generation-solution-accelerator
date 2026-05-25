@@ -71,3 +71,7 @@ pdf
 # RAI evaluation results
 rai_results/
 **/rai_results/
+# Python test coverage
+.coverage
+coverage.xml
+htmlcov/
