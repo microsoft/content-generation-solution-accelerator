@@ -18,7 +18,7 @@ Usage:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Iterable, Optional
 
 from event_utils import track_event_if_configured
