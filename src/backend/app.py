@@ -353,7 +353,7 @@ async def _handle_parse_brief(
         logger.exception(f"Failed to save message to CosmosDB: {e}")
 
     # Parse the brief
-    brief, questions, blocked = await orchestrator.parse_brief(message, user_id=user_id)
+    brief, questions, blocked = await orchestrator.parse_brief(message, user_id=user_id, conversation_id=conversation_id)
 
     if blocked:
         track_event_if_configured("Error_RAI_Check_Failed", {"conversation_id": conversation_id, "user_id": user_id, "status": "Brief parse blocked by RAI"})
@@ -537,7 +537,7 @@ async def _handle_refine_brief(
         logger.exception(f"Failed to save refinement message: {e}")
 
     # Use orchestrator to refine the brief
-    brief, questions, blocked = await orchestrator.parse_brief(message, user_id=user_id)
+    brief, questions, blocked = await orchestrator.parse_brief(message, user_id=user_id, conversation_id=conversation_id)
 
     if blocked:
         track_event_if_configured("Error_RAI_Check_Failed", {"conversation_id": conversation_id, "user_id": user_id, "status": "Brief refinement blocked by RAI"})
@@ -944,7 +944,8 @@ async def _run_regeneration_task(
             brief=brief,
             products=products_data,
             previous_image_prompt=previous_image_prompt,
-            user_id=user_id
+            user_id=user_id,
+            conversation_id=conversation_id
         )
 
         # Check for RAI block
@@ -1200,7 +1201,8 @@ async def _run_generation_task(task_id: str, brief: CreativeBrief, products_data
             brief=brief,
             products=products_data,
             generate_images=generate_images,
-            user_id=user_id
+            user_id=user_id,
+            conversation_id=conversation_id
         )
 
         logger.info(f"Generation task {task_id} completed. Response keys: {list(response.keys()) if response else 'None'}")

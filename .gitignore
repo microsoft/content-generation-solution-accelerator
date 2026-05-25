@@ -75,3 +75,4 @@ rai_results/
 .coverage
 coverage.xml
 htmlcov/
+coverage_html/

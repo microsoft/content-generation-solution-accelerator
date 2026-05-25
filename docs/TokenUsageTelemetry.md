@@ -33,8 +33,12 @@ Three custom events are sent on every request that consumes LLM tokens
 
 Set `APPLICATIONINSIGHTS_CONNECTION_STRING` in the backend environment.
 Application Insights wiring is already configured in `src/backend/app.py`
-via `configure_azure_monitor()`. If the env var is unset, telemetry calls
-are no-ops — token tracking has zero runtime impact when not configured.
+via `configure_azure_monitor()`. If the env var is unset, no telemetry is
+sent to Application Insights — `TokenUsageAccumulator.flush()` short-circuits
+the network emit path. Aggregated per-request totals are still written to
+the local logger at `INFO` level (one `[TOKEN USAGE] ...` line per flush)
+so token tracking remains useful for local debugging without a connection
+string.
 
 When deploying via `azd up`, the Bicep templates create an Application
 Insights instance and pass the connection string to the App Service.

@@ -56,6 +56,12 @@ TOKEN_ENDPOINT = "https://cognitiveservices.azure.com/.default"
 # orchestrator methods; read by ``_new_token_accumulator``.
 _current_user_id: ContextVar[str] = ContextVar("_current_user_id", default="")
 
+# Per-request conversation_id propagated the same way as ``_current_user_id``
+# so token-usage telemetry emitted from deep helpers (image generation,
+# regenerate flows, etc.) can be correlated by conversation in Application
+# Insights / KQL even when the helper isn't directly given a conversation_id.
+_current_conversation_id: ContextVar[str] = ContextVar("_current_conversation_id", default="")
+
 
 # Harmful content patterns to detect in USER INPUT before processing
 # This provides proactive content safety by blocking harmful requests at the input layer
@@ -726,12 +732,13 @@ class ContentGenerationOrchestrator:
         """Create a TokenUsageAccumulator pre-populated with this orchestrator's
         agent->model map and default chat model. Telemetry is best-effort.
 
-        If ``user_id`` is not provided, falls back to the per-request value
-        stored in the ``_current_user_id`` ContextVar so accumulators created
-        deep inside the workflow still carry the caller's user id.
+        If ``user_id`` / ``conversation_id`` are not provided, falls back to
+        the per-request values stored in the ``_current_user_id`` /
+        ``_current_conversation_id`` ContextVars so accumulators created deep
+        inside the workflow still carry the caller's correlation ids.
         """
         return TokenUsageAccumulator(
-            conversation_id=conversation_id,
+            conversation_id=conversation_id or _current_conversation_id.get(""),
             user_id=user_id or _current_user_id.get(""),
             agent_model_map=self._agent_model_map,
             default_model=self._default_model,
@@ -786,8 +793,12 @@ class ContentGenerationOrchestrator:
             full_input = f"Context:\n{json.dumps(context, indent=2)}\n\nUser Message:\n{message}"
 
         _ctx_token = _current_user_id.set(user_id or "")
+        _ctx_conv = _current_conversation_id.set(conversation_id or "")
+        # Defined outside the try so the except/finally branches can safely
+        # reference ``token_acc`` even if creation fails. Each flush call is
+        # guarded by ``if token_acc is not None`` to avoid NoneType errors.
+        token_acc: Optional[TokenUsageAccumulator] = None
         try:
-            # Per-request token usage accumulator for App Insights telemetry.
             token_acc = self._new_token_accumulator(conversation_id, user_id)
 
             # Collect events from the workflow stream
@@ -861,17 +872,19 @@ class ContentGenerationOrchestrator:
                             }
 
             # Emit aggregated LLM_*_Token_Usage events for the request.
-            try:
-                token_acc.flush(source="process_message")
-            except Exception as _tu_err:
-                logger.debug("token_usage flush failed: %s", _tu_err)
+            if token_acc is not None:
+                try:
+                    token_acc.flush(source="process_message")
+                except Exception as _tu_err:
+                    logger.debug("token_usage flush failed: %s", _tu_err)
 
         except Exception as e:
             logger.exception(f"Error processing message: {e}")
-            try:
-                token_acc.flush(source="process_message:error")
-            except Exception:
-                pass
+            if token_acc is not None:
+                try:
+                    token_acc.flush(source="process_message:error")
+                except Exception:
+                    pass
             yield {
                 "type": "error",
                 "content": f"An error occurred: {str(e)}",
@@ -880,6 +893,7 @@ class ContentGenerationOrchestrator:
             }
         finally:
             _current_user_id.reset(_ctx_token)
+            _current_conversation_id.reset(_ctx_conv)
 
     async def send_user_response(
         self,
@@ -917,10 +931,12 @@ class ContentGenerationOrchestrator:
             }
             return  # Exit immediately - do not continue workflow
 
+        _ctx_token = _current_user_id.set(user_id or "")
+        _ctx_conv = _current_conversation_id.set(conversation_id or "")
+        # See process_message for the rationale of the None-init pattern.
+        token_acc: Optional[TokenUsageAccumulator] = None
         try:
             token_acc = self._new_token_accumulator(conversation_id, user_id)
-            _ctx_token = _current_user_id.set(user_id or "")
-
             responses = {request_id: user_response}
             async for event in self._workflow.send_responses_streaming(responses):
                 try:
@@ -977,17 +993,19 @@ class ContentGenerationOrchestrator:
                                 "metadata": {"conversation_id": conversation_id}
                             }
 
-            try:
-                token_acc.flush(source="send_user_response")
-            except Exception as _tu_err:
-                logger.debug("token_usage flush failed: %s", _tu_err)
+            if token_acc is not None:
+                try:
+                    token_acc.flush(source="send_user_response")
+                except Exception as _tu_err:
+                    logger.debug("token_usage flush failed: %s", _tu_err)
 
         except Exception as e:
             logger.exception(f"Error sending user response: {e}")
-            try:
-                token_acc.flush(source="send_user_response:error")
-            except Exception:
-                pass
+            if token_acc is not None:
+                try:
+                    token_acc.flush(source="send_user_response:error")
+                except Exception:
+                    pass
             yield {
                 "type": "error",
                 "content": f"An error occurred: {str(e)}",
@@ -999,11 +1017,16 @@ class ContentGenerationOrchestrator:
                 _current_user_id.reset(_ctx_token)
             except (LookupError, ValueError, NameError):
                 pass
+            try:
+                _current_conversation_id.reset(_ctx_conv)
+            except (LookupError, ValueError, NameError):
+                pass
 
     async def parse_brief(
         self,
         brief_text: str,
-        user_id: str = ""
+        user_id: str = "",
+        conversation_id: str = ""
     ) -> tuple[CreativeBrief, str | None, bool]:
         """
         Parse a free-text creative brief into structured format.
@@ -1011,6 +1034,9 @@ class ContentGenerationOrchestrator:
 
         Args:
             brief_text: Free-text creative brief from user
+            user_id: Optional caller's user id, propagated to token usage telemetry
+            conversation_id: Optional conversation id, propagated to token usage
+                telemetry for correlation in Application Insights.
 
         Returns:
             tuple: (CreativeBrief, clarifying_questions_or_none, is_blocked)
@@ -1022,10 +1048,12 @@ class ContentGenerationOrchestrator:
             self.initialize()
 
         _ctx_token = _current_user_id.set(user_id or "")
+        _ctx_conv = _current_conversation_id.set(conversation_id or "")
         try:
             return await self._parse_brief_impl(brief_text, user_id)
         finally:
             _current_user_id.reset(_ctx_token)
+            _current_conversation_id.reset(_ctx_conv)
 
     async def _parse_brief_impl(
         self,
@@ -1527,7 +1555,8 @@ Important:
         brief: CreativeBrief,
         products: list = None,
         generate_images: bool = True,
-        user_id: str = ""
+        user_id: str = "",
+        conversation_id: str = ""
     ) -> dict:
         """
         Generate complete content package from a confirmed creative brief.
@@ -1537,6 +1566,9 @@ Important:
             products: List of products to feature
             generate_images: Whether to generate images
             user_id: Optional caller's user id, propagated to token usage telemetry
+            conversation_id: Optional conversation id, propagated to token usage
+                telemetry (including from deep helpers like ``_generate_foundry_image``)
+                so image-generation events can be correlated by conversation in KQL.
 
         Returns:
             dict: Generated content with compliance results
@@ -1545,10 +1577,12 @@ Important:
             self.initialize()
 
         _ctx_token = _current_user_id.set(user_id or "")
+        _ctx_conv = _current_conversation_id.set(conversation_id or "")
         try:
             return await self._generate_content_impl(brief, products, generate_images, user_id)
         finally:
             _current_user_id.reset(_ctx_token)
+            _current_conversation_id.reset(_ctx_conv)
 
     async def _generate_content_impl(
         self,
@@ -1580,8 +1614,10 @@ CTA: {brief.cta}
 Products to feature: {json.dumps(products or [])}
 """
 
+        # Created outside the try so the post-try flush is safe even if an
+        # exception fires before the first assignment inside the try block.
+        token_acc = self._new_token_accumulator(user_id=user_id)
         try:
-            token_acc = self._new_token_accumulator(user_id=user_id)
             # Generate text content
             text_response = await self._agents["text_content"].run(text_request)
             try:
@@ -1799,7 +1835,8 @@ Check against brand guidelines and flag any issues.
         brief: CreativeBrief,
         products: list = None,
         previous_image_prompt: str = None,
-        user_id: str = ""
+        user_id: str = "",
+        conversation_id: str = ""
     ) -> dict:
         """
         Regenerate just the image based on a user modification request.
@@ -1813,6 +1850,8 @@ Check against brand guidelines and flag any issues.
             products: List of products to feature
             previous_image_prompt: The previous image prompt (if available)
             user_id: Optional caller's user id, propagated to token usage telemetry
+            conversation_id: Optional conversation id, propagated to token usage
+                telemetry for correlation in Application Insights.
 
         Returns:
             dict: Regenerated image with updated prompt
@@ -1821,12 +1860,14 @@ Check against brand guidelines and flag any issues.
             self.initialize()
 
         _ctx_token = _current_user_id.set(user_id or "")
+        _ctx_conv = _current_conversation_id.set(conversation_id or "")
         try:
             return await self._regenerate_image_impl(
                 modification_request, brief, products, previous_image_prompt
             )
         finally:
             _current_user_id.reset(_ctx_token)
+            _current_conversation_id.reset(_ctx_conv)
 
     async def _regenerate_image_impl(
         self,

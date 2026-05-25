@@ -18,6 +18,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional
 
@@ -326,9 +327,17 @@ class TokenUsageAccumulator:
         return self.totals.total_tokens > 0
 
     def flush(self, *, source: str = "") -> None:
-        """Emit aggregated events to Application Insights. Safe to call once per request."""
+        """Emit aggregated events to Application Insights. Safe to call once per request.
+
+        Short-circuits when ``APPLICATIONINSIGHTS_CONNECTION_STRING`` is unset so
+        we don't fan out 1+N+M no-op ``track_event_if_configured`` calls (each of
+        which currently emits a WARNING log line). The summary log at the bottom
+        of this method is still useful for local debugging and is left in place.
+        """
         if not self.has_data():
             return
+
+        ai_configured = bool(os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"))
 
         base_dims = {
             "user_id": self.user_id,
@@ -336,51 +345,52 @@ class TokenUsageAccumulator:
             "source": source,
         }
 
-        try:
-            track_event_if_configured(
-                EVENT_SUMMARY,
-                {
-                    **base_dims,
-                    "total_input_tokens": str(self.totals.input_tokens),
-                    "total_output_tokens": str(self.totals.output_tokens),
-                    "total_tokens": str(self.totals.total_tokens),
-                    "agent_count": str(len(self.by_agent)),
-                    "model_count": str(len(self.by_model)),
-                },
-            )
-        except Exception as e:
-            logger.warning("Failed to emit %s: %s", EVENT_SUMMARY, e)
-
-        for agent_name, c in self.by_agent.items():
+        if ai_configured:
             try:
                 track_event_if_configured(
-                    EVENT_AGENT,
+                    EVENT_SUMMARY,
                     {
                         **base_dims,
-                        "agent_name": agent_name,
-                        "model_deployment_name": c.model_deployment_name or self.default_model,
-                        "input_tokens": str(c.input_tokens),
-                        "output_tokens": str(c.output_tokens),
-                        "total_tokens": str(c.total_tokens),
+                        "total_input_tokens": str(self.totals.input_tokens),
+                        "total_output_tokens": str(self.totals.output_tokens),
+                        "total_tokens": str(self.totals.total_tokens),
+                        "agent_count": str(len(self.by_agent)),
+                        "model_count": str(len(self.by_model)),
                     },
                 )
             except Exception as e:
-                logger.warning("Failed to emit %s for %s: %s", EVENT_AGENT, agent_name, e)
+                logger.warning("Failed to emit %s: %s", EVENT_SUMMARY, e)
 
-        for model_name, c in self.by_model.items():
-            try:
-                track_event_if_configured(
-                    EVENT_MODEL,
-                    {
-                        **base_dims,
-                        "model_deployment_name": model_name,
-                        "input_tokens": str(c.input_tokens),
-                        "output_tokens": str(c.output_tokens),
-                        "total_tokens": str(c.total_tokens),
-                    },
-                )
-            except Exception as e:
-                logger.warning("Failed to emit %s for %s: %s", EVENT_MODEL, model_name, e)
+            for agent_name, c in self.by_agent.items():
+                try:
+                    track_event_if_configured(
+                        EVENT_AGENT,
+                        {
+                            **base_dims,
+                            "agent_name": agent_name,
+                            "model_deployment_name": c.model_deployment_name or self.default_model,
+                            "input_tokens": str(c.input_tokens),
+                            "output_tokens": str(c.output_tokens),
+                            "total_tokens": str(c.total_tokens),
+                        },
+                    )
+                except Exception as e:
+                    logger.warning("Failed to emit %s for %s: %s", EVENT_AGENT, agent_name, e)
+
+            for model_name, c in self.by_model.items():
+                try:
+                    track_event_if_configured(
+                        EVENT_MODEL,
+                        {
+                            **base_dims,
+                            "model_deployment_name": model_name,
+                            "input_tokens": str(c.input_tokens),
+                            "output_tokens": str(c.output_tokens),
+                            "total_tokens": str(c.total_tokens),
+                        },
+                    )
+                except Exception as e:
+                    logger.warning("Failed to emit %s for %s: %s", EVENT_MODEL, model_name, e)
 
         logger.info(
             "[TOKEN USAGE] source=%s user=%s conv=%s total=%d (in=%d, out=%d) "

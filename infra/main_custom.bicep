@@ -93,7 +93,7 @@ param azureOpenaiAPIVersion string = '2025-01-01-preview'
 
 @minValue(10)
 @description('Optional. AI model deployment token capacity.')
-param gptModelCapacity int = 50
+param gptModelCapacity int = 150
 
 @minValue(1)
 @description('Optional. Image model deployment capacity (RPM).')

@@ -100,9 +100,11 @@ New-AzResourceGroupDeployment `
   `sourceId` it points at needs to be a valid Application Insights resource
   ID. This is what allows the workbook to fetch token-count telemetry from
   Application Insights deployed elsewhere.
-- The workbook name is a stable GUID derived from the resource group and the
-  Application Insights resource ID, so re-running the deployment updates the
-  same workbook in place rather than creating duplicates.
+- The workbook name is a stable GUID derived from the resource group ID and
+  a fixed seed (`'token-usage-workbook'`), so re-running the deployment updates
+  the same workbook in place rather than creating duplicates. The Application
+  Insights resource ID is **not** part of the name, which lets you re-point
+  the workbook at a different App Insights instance without renaming it.
 - Required permission: `Microsoft.Insights/workbooks/write` on the target
   resource group. **No** permissions are required on the Application Insights
   resource group at deployment time — the workbook only references it; the
