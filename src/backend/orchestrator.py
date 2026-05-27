@@ -20,7 +20,7 @@ import json
 import logging
 import re
 from contextvars import ContextVar
-from typing import AsyncIterator, Optional, cast
+from typing import Any, AsyncIterator, Mapping, Optional, cast
 
 from agent_framework import (
     ChatMessage,
@@ -41,16 +41,23 @@ except ImportError:
     FOUNDRY_AVAILABLE = False
     AIProjectClient = None
 
+from llm_token_telemetry import (
+    TokenUsage,
+    TokenUsageEmitter,
+    extract_usage,
+    extract_usage_from_dict,
+    extract_usage_from_stream_chunk,
+)
 from models import CreativeBrief
 from settings import app_settings
-from token_usage import TokenUsageAccumulator
+from telemetry import token_emitter
 
 logger = logging.getLogger(__name__)
 
 # Token endpoint for Azure Cognitive Services (used for Azure OpenAI)
 TOKEN_ENDPOINT = "https://cognitiveservices.azure.com/.default"
 
-# Per-request user_id propagated to TokenUsageAccumulator instances created
+# Per-request user_id propagated to _RequestTokenTracker instances created
 # anywhere inside the request (including deep workflow helpers like
 # ``_generate_foundry_image``). Set at the entry points of the public
 # orchestrator methods; read by ``_new_token_accumulator``.
@@ -493,6 +500,154 @@ After validation, hand back to triage_agent with results.
 """
 
 
+class _RequestTokenTracker:
+    """Per-request multi-agent token accumulator.
+
+    Aggregates ``TokenUsage`` per agent and per model deployment over the
+    lifetime of a single orchestrator request, then emits the standardized
+    ``LLM_Token_Usage_Summary`` / ``LLM_Agent_Token_Usage`` /
+    ``LLM_Model_Token_Usage`` custom events via the shared
+    :class:`TokenUsageEmitter` on :meth:`flush`. Identical event names and
+    dimension keys to the cross-accelerator helper in
+    :mod:`llm_token_telemetry`. Telemetry failures are logged but never
+    raised.
+    """
+
+    __slots__ = (
+        "_emitter",
+        "_user_id",
+        "_conversation_id",
+        "_agent_model_map",
+        "_default_model",
+        "by_agent",
+        "by_model",
+        "total",
+    )
+
+    def __init__(
+        self,
+        emitter: TokenUsageEmitter,
+        *,
+        user_id: str = "",
+        conversation_id: str = "",
+        agent_model_map: Optional[Mapping[str, str]] = None,
+        default_model: str = "",
+    ) -> None:
+        self._emitter = emitter
+        self._user_id = user_id or ""
+        self._conversation_id = conversation_id or ""
+        self._agent_model_map: dict[str, str] = dict(agent_model_map or {})
+        self._default_model = default_model or ""
+        self.by_agent: dict[str, tuple[TokenUsage, str]] = {}
+        self.by_model: dict[str, TokenUsage] = {}
+        self.total: TokenUsage = TokenUsage()
+
+    def _resolve_model(self, agent_name: str) -> str:
+        return self._agent_model_map.get(agent_name) or self._default_model
+
+    def _add(self, agent_name: str, usage: TokenUsage) -> None:
+        if not usage.has_any:
+            return
+        agent = agent_name or "unknown_agent"
+        model = self._resolve_model(agent)
+        prev_usage, prev_model = self.by_agent.get(agent, (TokenUsage(), model))
+        self.by_agent[agent] = (prev_usage + usage, prev_model or model)
+        if model:
+            self.by_model[model] = self.by_model.get(model, TokenUsage()) + usage
+        self.total = self.total + usage
+
+    def record(self, agent_name: str, usage: TokenUsage) -> None:
+        """Record a pre-extracted :class:`TokenUsage` for the named agent."""
+        self._add(agent_name, usage)
+
+    def record_response(self, *, agent_name: str, response: Any) -> bool:
+        """Extract usage from an ``AgentResponse`` and record it. Returns True on success."""
+        usage = extract_usage(response)
+        if usage:
+            self._add(agent_name, usage)
+            return True
+        return False
+
+    def record_event(self, event: Any) -> bool:
+        """Extract usage from a workflow ``run_stream`` event and record it.
+
+        Reads ``event.executor_id`` for per-agent attribution and falls back
+        through ``extract_usage_from_stream_chunk`` then ``extract_usage`` to
+        cover both ``AgentRunUpdateEvent`` and ``AgentRunEvent`` data shapes.
+        """
+        if event is None:
+            return False
+        executor_id = getattr(event, "executor_id", None)
+        data = getattr(event, "data", None)
+        if data is None or not executor_id:
+            return False
+        usage = extract_usage_from_stream_chunk(data) or extract_usage(data)
+        if usage:
+            self._add(executor_id, usage)
+            return True
+        return False
+
+    def record_image_api_response(
+        self, *, agent_name: str, response_json: Optional[dict], model: str = ""
+    ) -> bool:
+        """Record token usage from an image-generation REST response (OpenAI shape)."""
+        if not isinstance(response_json, dict):
+            return False
+        usage = extract_usage_from_dict(response_json.get("usage"))
+        if not usage:
+            return False
+        if model and agent_name not in self._agent_model_map:
+            self._agent_model_map[agent_name] = model
+        self._add(agent_name, usage)
+        return True
+
+    def has_data(self) -> bool:
+        return self.total.has_any
+
+    def flush(self, *, source: str = "") -> None:
+        """Emit aggregated LLM_*_Token_Usage events. Safe to call once per request."""
+        if not self.has_data():
+            return
+        dims = {
+            "user_id": self._user_id,
+            "conversation_id": self._conversation_id,
+            "source": source,
+        }
+        for agent_name, (usage, model) in self.by_agent.items():
+            self._emitter.emit_agent(
+                agent_name=agent_name,
+                model_deployment_name=model or self._default_model,
+                usage=usage,
+                **dims,
+            )
+        for model_name, usage in self.by_model.items():
+            self._emitter.emit_model(
+                model_deployment_name=model_name,
+                usage=usage,
+                **dims,
+            )
+        primary_model = next(iter(self.by_model), self._default_model)
+        self._emitter.emit_summary(
+            usage=self.total,
+            agent_count=len(self.by_agent),
+            model_count=len(self.by_model) or 1,
+            primary_model=primary_model,
+            **dims,
+        )
+        logger.info(
+            "[TOKEN USAGE] source=%s user=%s conv=%s total=%d (in=%d, out=%d) "
+            "agents=%s models=%s",
+            source,
+            self._user_id,
+            self._conversation_id,
+            self.total.total_tokens,
+            self.total.input_tokens,
+            self.total.output_tokens,
+            {k: v[0].total_tokens for k, v in self.by_agent.items()},
+            {k: v.total_tokens for k, v in self.by_model.items()},
+        )
+
+
 class ContentGenerationOrchestrator:
     """
     Orchestrates the multi-agent content generation workflow using
@@ -728,16 +883,18 @@ class ContentGenerationOrchestrator:
 
     def _new_token_accumulator(
         self, conversation_id: str = "", user_id: str = ""
-    ) -> TokenUsageAccumulator:
-        """Create a TokenUsageAccumulator pre-populated with this orchestrator's
-        agent->model map and default chat model. Telemetry is best-effort.
+    ) -> _RequestTokenTracker:
+        """Create a :class:`_RequestTokenTracker` pre-populated with this
+        orchestrator's agent->model map and default chat model. Telemetry
+        is best-effort.
 
         If ``user_id`` / ``conversation_id`` are not provided, falls back to
         the per-request values stored in the ``_current_user_id`` /
-        ``_current_conversation_id`` ContextVars so accumulators created deep
+        ``_current_conversation_id`` ContextVars so trackers created deep
         inside the workflow still carry the caller's correlation ids.
         """
-        return TokenUsageAccumulator(
+        return _RequestTokenTracker(
+            token_emitter,
             conversation_id=conversation_id or _current_conversation_id.get(""),
             user_id=user_id or _current_user_id.get(""),
             agent_model_map=self._agent_model_map,
@@ -797,7 +954,7 @@ class ContentGenerationOrchestrator:
         # Defined outside the try so the except/finally branches can safely
         # reference ``token_acc`` even if creation fails. Each flush call is
         # guarded by ``if token_acc is not None`` to avoid NoneType errors.
-        token_acc: Optional[TokenUsageAccumulator] = None
+        token_acc: Optional[_RequestTokenTracker] = None
         try:
             token_acc = self._new_token_accumulator(conversation_id, user_id)
 
@@ -934,7 +1091,7 @@ class ContentGenerationOrchestrator:
         _ctx_token = _current_user_id.set(user_id or "")
         _ctx_conv = _current_conversation_id.set(conversation_id or "")
         # See process_message for the rationale of the None-init pattern.
-        token_acc: Optional[TokenUsageAccumulator] = None
+        token_acc: Optional[_RequestTokenTracker] = None
         try:
             token_acc = self._new_token_accumulator(conversation_id, user_id)
             responses = {request_id: user_response}

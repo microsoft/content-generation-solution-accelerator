@@ -7,7 +7,7 @@ This page describes what is emitted, how to enable it, and how to visualize it.
 ## What is emitted
 
 Three custom events are sent on every request that consumes LLM tokens
-(see `src/backend/token_usage.py`):
+(see `src/backend/llm_token_telemetry.py`):
 
 | Event | When | Custom dimensions |
 |---|---|---|
@@ -34,7 +34,7 @@ Three custom events are sent on every request that consumes LLM tokens
 Set `APPLICATIONINSIGHTS_CONNECTION_STRING` in the backend environment.
 Application Insights wiring is already configured in `src/backend/app.py`
 via `configure_azure_monitor()`. If the env var is unset, no telemetry is
-sent to Application Insights — `TokenUsageAccumulator.flush()` short-circuits
+sent to Application Insights — `_RequestTokenTracker.flush()` short-circuits
 the network emit path. Aggregated per-request totals are still written to
 the local logger at `INFO` level (one `[TOKEN USAGE] ...` line per flush)
 so token tracking remains useful for local debugging without a connection
@@ -71,14 +71,6 @@ It contains 12 queries:
 1. Open the **Application Insights** resource in the Azure portal.
 2. Go to **Monitoring → Logs**.
 3. Paste any query from the file above and click **Run**.
-
-### Build a workbook
-
-1. Open **Application Insights → Workbooks → + New**.
-2. Add a **Query** step and paste a query from `token-usage-queries.kql`.
-3. Pick a visualization (bar, time chart, table) and pin to a dashboard.
-4. Repeat for each query you want as a tile.
-5. Save the workbook to make it reusable across the team.
 
 ## Verifying locally
 

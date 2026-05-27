@@ -66,15 +66,6 @@ azd env set APPLICATIONINSIGHTS_CONNECTION_STRING "$APPI_CS"
 azd deploy   # re-deploy app code only, no infra changes
 ```
 
-## Then deploy the workbook
-
-```bash
-az deployment group create \
-  --resource-group <workbook-rg-anywhere> \
-  --template-file infra/workbook/workbook.bicep \
-  --parameters applicationInsightsResourceId="$APPI_ID"
-```
-
 ## Idempotency / re-runs
 
 Re-running this deployment against the same RG is safe — AVM modules use

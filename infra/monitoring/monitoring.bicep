@@ -87,7 +87,7 @@ output logAnalyticsWorkspaceResourceId string = logAnalyticsWorkspace.outputs.re
 @description('Name of the Log Analytics workspace.')
 output logAnalyticsWorkspaceName string = logAnalyticsWorkspaceResourceName
 
-@description('Resource ID of the Application Insights component (pass this to infra/workbook/workbook.bicep).')
+@description('Resource ID of the Application Insights component.')
 output applicationInsightsResourceId string = applicationInsights.outputs.resourceId
 
 @description('Name of the Application Insights component.')

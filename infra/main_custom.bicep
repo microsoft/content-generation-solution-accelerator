@@ -369,11 +369,6 @@ module applicationInsights 'br/public:avm/res/insights/component:0.7.1' = if (en
   }
 }
 
-// ========== Token Usage Workbook ========== //
-// The "Token Usage" Application Insights workbook is now deployed separately
-// via infra/workbook/workbook.bicep so it can target an Application Insights
-// resource in any resource group / subscription. See infra/workbook/README.md.
-
 // ========== User Assigned Identity ========== //
 var userAssignedIdentityResourceName = 'id-${solutionSuffix}'
 module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.5.0' = {

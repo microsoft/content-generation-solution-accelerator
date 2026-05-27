@@ -4,13 +4,13 @@
 // Run these in: App Insights -> Logs (or Log Analytics -> Logs) for the
 // workspace attached to the Content Generation backend.
 //
-// Custom events emitted by the backend (see src/backend/token_usage.py):
+// Custom events emitted by the backend (see src/backend/llm_token_telemetry.py):
 //   * LLM_Token_Usage_Summary — one per request; aggregate totals
 //   * LLM_Agent_Token_Usage   — one per agent that consumed tokens in the request
 //   * LLM_Model_Token_Usage   — one per model deployment that was hit
 //
 // Common custom dimensions on every event:
-//   user_id, conversation_id, source
+//   user_id, conversation_id, source, app
 // Plus event-specific numeric dimensions stored as STRINGS — always cast with
 // toint() / tolong() in KQL.
 // =============================================================================
