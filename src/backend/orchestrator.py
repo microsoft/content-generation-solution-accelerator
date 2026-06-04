@@ -1484,7 +1484,16 @@ Important:
 """
 
         try:
+            token_acc = self._new_token_accumulator()
             response = await research_agent.run(select_prompt)
+            try:
+                token_acc.record_response(agent_name="research_agent", response=response)
+            except Exception as _tu_err:
+                logger.debug("token_usage record (research_agent) failed: %s", _tu_err)
+            try:
+                token_acc.flush(source="select_products")
+            except Exception:
+                pass
             response_text = str(response)
 
             # Extract JSON from response

@@ -337,7 +337,7 @@ async def _handle_parse_brief(
 
         if not has_existing_title:
             title_service = get_title_service()
-            generated_title = await title_service.generate_title(message)
+            generated_title = await title_service.generate_title(message, user_id=user_id, conversation_id=conversation_id)
 
         await cosmos_service.add_message_to_conversation(
             conversation_id=conversation_id,
@@ -353,6 +353,7 @@ async def _handle_parse_brief(
         logger.exception(f"Failed to save message to CosmosDB: {e}")
 
     # Parse the brief
+    brief, questions, blocked = await orchestrator.parse_brief(message, user_id=user_id, conversation_id=conversation_id)
     brief, questions, blocked = await orchestrator.parse_brief(message, user_id=user_id, conversation_id=conversation_id)
 
     if blocked:
@@ -1134,7 +1135,7 @@ async def _handle_general_chat(
 
         if not has_existing_title:
             title_service = get_title_service()
-            generated_title = await title_service.generate_title(message)
+            generated_title = await title_service.generate_title(message, user_id=user_id, conversation_id=conversation_id)
 
         await cosmos_service.add_message_to_conversation(
             conversation_id=conversation_id,
