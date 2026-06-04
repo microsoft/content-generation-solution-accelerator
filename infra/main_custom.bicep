@@ -1068,20 +1068,10 @@ resource aciTelemetry 'Microsoft.Resources/deployments@2025-04-01' = if (enableT
   }
 }
 
-// Hash that changes whenever the monitoring config is toggled.
-// Used as an ACI tag so that toggling enableMonitoring forces ARM to detect drift on the
-// container group, triggering a restart and re-applying env vars like
-// APPLICATIONINSIGHTS_CONNECTION_STRING. ACI does not natively support forceUpdateTag,
-// and tags must be calculatable at deployment-start (no runtime references allowed).
-var monitoringConfigHash = uniqueString(string(enableMonitoring))
-
 resource containerInstance 'Microsoft.ContainerInstance/containerGroups@2025-09-01' = if (shouldDeployACI) {
   name: containerInstanceName
   location: solutionLocation
-  tags: union(tags, {
-    'monitoring-enabled': string(enableMonitoring)
-    'monitoring-config-hash': monitoringConfigHash
-  })
+  tags: tags
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {

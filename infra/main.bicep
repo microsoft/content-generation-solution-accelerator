@@ -1002,24 +1002,12 @@ module webSite 'modules/web-sites.bicep' = {
 
 // ========== Container Instance (Backend API) ========== //
 var containerInstanceName = 'aci-${solutionSuffix}'
-// Hash that changes whenever the monitoring config (enableMonitoring + connection string) changes.
-// Used as an ACI tag so that toggling enableMonitoring (or rotating the App Insights component)
-// forces ARM to detect drift on the container group, triggering a restart and re-applying env vars
-// like APPLICATIONINSIGHTS_CONNECTION_STRING. ACI does not natively support forceUpdateTag.
-var monitoringConfigHash = uniqueString(
-  string(enableMonitoring),
-  enableMonitoring ? applicationInsights!.outputs.connectionString : 'monitoring-disabled'
-)
-
 module containerInstance 'modules/container-instance.bicep' = {
   name: take('module.container-instance.${containerInstanceName}', 64)
   params: {
     name: containerInstanceName
     location: solutionLocation
-    tags: union(tags, {
-      'monitoring-enabled': string(enableMonitoring)
-      'monitoring-config-hash': monitoringConfigHash
-    })
+    tags: tags
     containerImage: '${acrResourceName}.azurecr.io/content-gen-api:${imageTag}'
     cpu: 2
     memoryInGB: 4
