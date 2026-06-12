@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 # Environment variables exempt from the AZURE_ENV_ naming convention.
-_ENV_VAR_EXCEPTIONS = {"AZURE_LOCATION", "AZURE_EXISTING_AIPROJECT_RESOURCE_ID"}
+_ENV_VAR_EXCEPTIONS = {"AZURE_LOCATION", "AZURE_EXISTING_AIPROJECT_RESOURCE_ID", "DEPLOYMENT_FLAVOR"}
 
 # ---------------------------------------------------------------------------
 # Bicep param parser

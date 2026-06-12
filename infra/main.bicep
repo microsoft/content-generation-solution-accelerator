@@ -1,9 +1,32 @@
-// ========== main.bicep ========== //
+// ============================================================================
+// main.bicep — Deployment Router
+// Description: Routes deployment to the appropriate infrastructure flavor.
+//   - 'bicep'   → Vanilla Bicep / AVM-wrapper modules (Docker build, creates ACR)
+//   - 'avm'     → AVM-based modules (uses existing ACR with pre-built images)
+//   - 'avm-waf' → AVM-based modules with WAF-aligned features
+//                 (monitoring, private networking, scalability, redundancy)
+// ============================================================================
 targetScope = 'resourceGroup'
 
 metadata name = 'Intelligent Content Generation Accelerator'
 metadata description = '''Solution Accelerator for multimodal marketing content generation using Microsoft Agent Framework.
 '''
+
+// ============================================================================
+// Routing Parameter
+// ============================================================================
+
+@allowed([
+  'bicep'
+  'avm'
+  'avm-waf'
+])
+@description('Required. Deployment flavor: bicep (Docker build, creates ACR), avm (AVM, existing ACR), or avm-waf (AVM WAF-aligned).')
+param deploymentFlavor string = 'avm'
+
+// ============================================================================
+// Parameters — shared across all flavors
+// ============================================================================
 
 @minLength(3)
 @maxLength(15)
@@ -36,9 +59,6 @@ param location string
 @description('Optional. Secondary location for databases creation.')
 param secondaryLocation string = 'uksouth'
 
-// NOTE: Metadata must be compile-time constants. Update usageName manually if you change model parameters.
-// Format: 'OpenAI.<DeploymentType>.<ModelName>,<Capacity>'
-// Allowed regions: Union of GPT-5.1, gpt-image-1-mini, and gpt-image-1.5 GlobalStandard availability
 @allowed([
   'australiaeast'
   'canadaeast'
@@ -104,27 +124,24 @@ param existingLogAnalyticsWorkspaceId string = ''
 @description('Optional. Resource ID of an existing Foundry project.')
 param azureExistingAIProjectResourceId string = ''
 
-@description('Optional. Deploy Azure Bastion and Jumpbox resources for private network administration.')
-param deployBastionAndJumpbox bool = false
-
-@description('Optional. Jumpbox VM size. Must support accelerated networking and Premium SSD.')
-param vmSize string = ''
-
-@description('Optional. Jumpbox VM admin username.')
-param vmAdminUsername string = ''
-
-@description('Optional. Jumpbox VM admin password.')
-@secure()
-param vmAdminPassword string = ''
+@description('Optional. Enable Azure AI Foundry mode for multi-agent orchestration.')
+param useFoundryMode bool = true
 
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags object = {}
 
+@description('Optional. Enable/Disable usage telemetry for module.')
+param enableTelemetry bool = true
+
+@description('Optional. Created by user name.')
+param createdBy string = contains(deployer(), 'userPrincipalName') ? split(deployer().userPrincipalName, '@')[0] : deployer().objectId
+
+// ============================================================================
+// Parameters — WAF / feature flags (AVM flavors)
+// ============================================================================
+
 @description('Optional. Enable monitoring for applicable resources (WAF-aligned).')
 param enableMonitoring bool = false
-
-@description('Optional. Enable Azure AI Foundry mode for multi-agent orchestration.')
-param useFoundryMode bool = true
 
 @description('Optional. Enable scalability for applicable resources (WAF-aligned).')
 param enableScalability bool = false
@@ -135,1020 +152,230 @@ param enableRedundancy bool = false
 @description('Optional. Enable private networking for applicable resources (WAF-aligned).')
 param enablePrivateNetworking bool = false
 
-@description('Optional. The existing Container Registry name (without .azurecr.io). Must contain pre-built images: content-gen-app and content-gen-api.')
+@description('Optional. Deploy Azure Bastion and Jumpbox resources for private network administration.')
+param deployBastionAndJumpbox bool = false
+
+@description('Optional. Jumpbox VM size. Must support accelerated networking and Premium SSD.')
+param vmSize string = ''
+
+@description('Optional. Jumpbox VM admin username.')
+param vmAdminUsername string = ''
+
+@secure()
+@description('Optional. Jumpbox VM admin password.')
+param vmAdminPassword string = ''
+
+// ============================================================================
+// Parameters — Container image (bicep + avm flavors)
+// ============================================================================
+
+@description('Optional. The Container Registry name (without .azurecr.io). Used by the avm flavor to reference an existing registry with pre-built images.')
 param acrName string = 'contentgencontainerreg'
 
-@description('Optional. Image Tag.')
+@description('Optional. Image tag.')
 param imageTag string = 'latest'
 
-@description('Optional. Enable/Disable usage telemetry for module.')
-param enableTelemetry bool = true
+@description('Optional. Frontend image name (bicep flavor builds and pushes this).')
+param frontendImageName string = 'content-gen-app'
 
-@description('Optional. Created by user name.')
-param createdBy string = contains(deployer(), 'userPrincipalName')? split(deployer().userPrincipalName, '@')[0]: deployer().objectId
+@description('Optional. Backend image name (bicep flavor builds and pushes this).')
+param backendImageName string = 'content-gen-api'
 
-// ============== //
-// Variables      //
-// ============== //
+// ============================================================================
+// Derived Variables
+// ============================================================================
 
-var solutionLocation = empty(location) ? resourceGroup().location : location
+var isAvm = deploymentFlavor == 'avm' || deploymentFlavor == 'avm-waf'
+var isBicep = deploymentFlavor == 'bicep'
 
-// acrName is required - points to existing ACR with pre-built images
-var acrResourceName = acrName
-var solutionSuffix = toLower(trim(replace(
-  replace(
-    replace(replace(replace(replace('${solutionName}${solutionUniqueText}', '-', ''), '_', ''), '.', ''), '/', ''),
-    ' ',
-    ''
-  ),
-  '*',
-  ''
-)))
+// ============================================================================
+// Module: AVM Deployment (avm and avm-waf)
+// ============================================================================
 
-var cosmosDbZoneRedundantHaRegionPairs = {
-  australiaeast: 'uksouth'
-  centralus: 'eastus2'
-  eastasia: 'southeastasia'
-  eastus: 'centralus'
-  eastus2: 'centralus'
-  japaneast: 'australiaeast'
-  northeurope: 'westeurope'
-  southeastasia: 'eastasia'
-  uksouth: 'westeurope'
-  westus: 'westus3'
-  westus3: 'westus'
-}
-var cosmosDbHaLocation = cosmosDbZoneRedundantHaRegionPairs[?resourceGroup().location] ?? secondaryLocation
-
-var replicaRegionPairs = {
-  australiaeast: 'australiasoutheast'
-  centralus: 'westus'
-  eastasia: 'japaneast'
-  eastus: 'centralus'
-  eastus2: 'centralus'
-  japaneast: 'eastasia'
-  northeurope: 'westeurope'
-  southeastasia: 'eastasia'
-  uksouth: 'westeurope'
-  westus: 'westus3'
-  westus3: 'westus'
-}
-var replicaLocation = replicaRegionPairs[?resourceGroup().location] ?? secondaryLocation
-
-var azureSearchIndex = 'products'
-var aiSearchName = 'srch-${solutionSuffix}'
-
-// Extracts subscription, resource group, and workspace name from the resource ID
-var useExistingLogAnalytics = !empty(existingLogAnalyticsWorkspaceId)
-var useExistingAiFoundryAiProject = !empty(azureExistingAIProjectResourceId)
-var aiFoundryAiServicesResourceGroupName = useExistingAiFoundryAiProject
-  ? split(azureExistingAIProjectResourceId, '/')[4]
-  : 'rg-${solutionSuffix}'
-var aiFoundryAiServicesSubscriptionId = useExistingAiFoundryAiProject
-  ? split(azureExistingAIProjectResourceId, '/')[2]
-  : subscription().subscriptionId
-var aiFoundryAiServicesResourceName = useExistingAiFoundryAiProject
-  ? split(azureExistingAIProjectResourceId, '/')[8]
-  : 'aif-${solutionSuffix}'
-var aiFoundryAiProjectResourceName = useExistingAiFoundryAiProject
-  ? split(azureExistingAIProjectResourceId, '/')[10]
-  : 'proj-${solutionSuffix}'
-
-// Base model deployments (GPT only - no embeddings needed for content generation)
-var baseModelDeployments = [
-  {
-    format: 'OpenAI'
-    name: gptModelName
-    model: gptModelName
-    sku: {
-      name: gptModelDeploymentType
-      capacity: gptModelCapacity
-    }
-    version: gptModelVersion
-    raiPolicyName: 'Microsoft.Default'
-  }
-]
-
-// Image model configuration based on choice
-var imageModelConfig = {
-  'gpt-image-1-mini': {
-    name: 'gpt-image-1-mini'
-    version: '2025-10-06'
-    sku: 'GlobalStandard'
-  }
-  'gpt-image-1.5': {
-    name: 'gpt-image-1.5'
-    version: '2025-12-16'
-    sku: 'GlobalStandard'
-  }
-  none: {
-    name: ''
-    version: ''
-    sku: ''
-  }
-}
-
-// Image model deployment (optional)
-var imageModelDeployment = imageModelChoice != 'none' ? [
-  {
-    format: 'OpenAI'
-    name: imageModelConfig[imageModelChoice].name
-    model: imageModelConfig[imageModelChoice].name
-    sku: {
-      name: imageModelConfig[imageModelChoice].sku
-      capacity: imageModelCapacity
-    }
-    version: imageModelConfig[imageModelChoice].version
-    raiPolicyName: 'Microsoft.Default'
-  }
-] : []
-
-// Combine deployments based on imageModelChoice
-var aiFoundryAiServicesModelDeployment = concat(baseModelDeployments, imageModelDeployment)
-
-var aiFoundryAiProjectDescription = 'Content Generation AI Foundry Project'
-
-// Reference existing resource group to access current tags
-resource existingResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
-  scope: subscription()
-  name: resourceGroup().name
-}
-
-var existingTags = existingResourceGroup.tags ?? {}
-
-// ============== //
-// Resources      //
-// ============== //
-
-#disable-next-line no-deployments-resources
-resource avmTelemetry 'Microsoft.Resources/deployments@2025-04-01' = if (enableTelemetry) {
-  name: '46d3xbcp.ptn.sa-contentgeneration.${replace('-..--..-', '.', '-')}.${substring(uniqueString(deployment().name, solutionLocation), 0, 4)}'
-  properties: {
-    mode: 'Incremental'
-    template: {
-      '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
-      contentVersion: '1.0.0.0'
-      resources: []
-      outputs: {
-        telemetry: {
-          type: 'String'
-          value: 'For more information, see https://aka.ms/avm/TelemetryInfo'
-        }
-      }
-    }
-  }
-}
-
-// ========== Resource Group Tag ========== //
-resource resourceGroupTags 'Microsoft.Resources/tags@2025-04-01' = {
-  name: 'default'
-  properties: {
-    tags: union(
-      existingTags,
-      tags,
-      {
-        TemplateName: 'ContentGen'
-        Type: enablePrivateNetworking ? 'WAF' : 'Non-WAF'
-        CreatedBy: createdBy
-      }
-    )
-  }
-}
-
-// ========== Log Analytics Workspace ========== //
-var logAnalyticsWorkspaceResourceName = 'log-${solutionSuffix}'
-module logAnalyticsWorkspace 'br/public:avm/res/operational-insights/workspace:0.15.0' = if (enableMonitoring && !useExistingLogAnalytics) {
-  name: take('avm.res.operational-insights.workspace.${logAnalyticsWorkspaceResourceName}', 64)
+module avmDeployment './avm/main.bicep' = if (isAvm) {
+  name: take('module.avm.${solutionName}', 64)
   params: {
-    name: logAnalyticsWorkspaceResourceName
-    tags: tags
-    location: solutionLocation
-    enableTelemetry: enableTelemetry
-    skuName: 'PerGB2018'
-    dataRetention: 365
-    features: { enableLogAccessUsingOnlyResourcePermissions: true }
-    diagnosticSettings: [{ useThisWorkspace: true }]
-    dailyQuotaGb: enableRedundancy ? '10' : null
-    replication: enableRedundancy
-      ? {
-          enabled: true
-          location: replicaLocation
-        }
-      : null
-    publicNetworkAccessForIngestion: enablePrivateNetworking ? 'Disabled' : 'Enabled'
-    publicNetworkAccessForQuery: enablePrivateNetworking ? 'Disabled' : 'Enabled'
-  }
-}
-var logAnalyticsWorkspaceResourceId = useExistingLogAnalytics 
-  ? existingLogAnalyticsWorkspaceId 
-  : (enableMonitoring ? logAnalyticsWorkspace!.outputs.resourceId : '')
-
-// ========== Application Insights ========== //
-var applicationInsightsResourceName = 'appi-${solutionSuffix}'
-module applicationInsights 'br/public:avm/res/insights/component:0.7.1' = if (enableMonitoring) {
-  name: take('avm.res.insights.component.${applicationInsightsResourceName}', 64)
-  params: {
-    name: applicationInsightsResourceName
-    tags: tags
-    location: solutionLocation
-    enableTelemetry: enableTelemetry
-    retentionInDays: 365
-    kind: 'web'
-    disableIpMasking: false
-    flowType: 'Bluefield'
-    workspaceResourceId: logAnalyticsWorkspaceResourceId
-  }
-}
-
-// ========== User Assigned Identity ========== //
-var userAssignedIdentityResourceName = 'id-${solutionSuffix}'
-module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.5.0' = {
-  name: take('avm.res.managed-identity.user-assigned-identity.${userAssignedIdentityResourceName}', 64)
-  params: {
-    name: userAssignedIdentityResourceName
-    location: solutionLocation
-    tags: tags
-    enableTelemetry: enableTelemetry
-  }
-}
-
-// ========== Virtual Network and Networking Components ========== //
-var deployAdminAccessResources = enablePrivateNetworking && deployBastionAndJumpbox && !empty(vmAdminPassword)
-module virtualNetwork 'modules/virtualNetwork.bicep' = if (enablePrivateNetworking) {
-  name: take('module.virtualNetwork.${solutionSuffix}', 64)
-  params: {
-    vnetName: 'vnet-${solutionSuffix}'
-    addressPrefixes: ['10.0.0.0/20'] // 4096 addresses (enough for 8 /23 subnets or 16 /24)
-    location: solutionLocation
-    deployBastionAndJumpbox: deployAdminAccessResources
-    tags: tags
-    logAnalyticsWorkspaceId: logAnalyticsWorkspaceResourceId
-    resourceSuffix: solutionSuffix
-    enableTelemetry: enableTelemetry
-  }
-}
-
-// Azure Bastion Host
-var bastionHostName = 'bas-${solutionSuffix}'
-var zoneSupportedJumpboxLocations = [
-  'australiaeast'
-  'centralus'
-  'eastus'
-  'eastus2'
-  'japaneast'
-  'northeurope'
-  'southeastasia'
-  'swedencentral'
-  'uksouth'
-  'westus3'
-]
-module bastionHost 'br/public:avm/res/network/bastion-host:0.8.2' = if (deployAdminAccessResources) {
-  name: take('avm.res.network.bastion-host.${bastionHostName}', 64)
-  params: {
-    name: bastionHostName
-    skuName: 'Standard'
-    location: solutionLocation
-    virtualNetworkResourceId: virtualNetwork!.outputs.resourceId
-    diagnosticSettings: !empty(logAnalyticsWorkspaceResourceId)
-      ? [
-          {
-            name: 'bastionDiagnostics'
-            workspaceResourceId: logAnalyticsWorkspaceResourceId
-            logCategoriesAndGroups: [
-              {
-                categoryGroup: 'allLogs'
-                enabled: true
-              }
-            ]
-          }
-        ]
-      : []
-    tags: tags
-    enableTelemetry: enableTelemetry
-    publicIPAddressObject: {
-      name: 'pip-${bastionHostName}'
-    }
-  }
-}
-
-// Jumpbox Virtual Machine
-var jumpboxUniqueToken = take(uniqueString(resourceGroup().id, solutionSuffix), 10)
-var jumpboxVmName = take('vm-${jumpboxUniqueToken}', 15)
-module jumpboxVM 'br/public:avm/res/compute/virtual-machine:0.21.0' = if (deployAdminAccessResources) {
-  name: take('avm.res.compute.virtual-machine.${jumpboxVmName}', 64)
-  params: {
-    name: take(jumpboxVmName, 15)
-    enableTelemetry: enableTelemetry
-    computerName: take(jumpboxVmName, 15)
-    osType: 'Windows'
-    vmSize: empty(vmSize) ? 'Standard_D2s_v5' : vmSize
-    adminUsername: empty(vmAdminUsername) ? 'JumpboxAdminUser' : vmAdminUsername
-    adminPassword: vmAdminPassword
-    managedIdentities: {
-      userAssignedResourceIds: [
-        userAssignedIdentity.outputs.resourceId
-      ]
-    }
-    availabilityZone: contains(zoneSupportedJumpboxLocations, solutionLocation) ? 1 : -1
-    imageReference: {
-      publisher: 'microsoft-dsvm'
-      offer: 'dsvm-win-2022'
-      sku: 'winserver-2022'
-      version: 'latest'
-    }
-    nicConfigurations: [
-      {
-        name: 'nic-${jumpboxVmName}'
-        enableAcceleratedNetworking: true
-        ipConfigurations: [
-          {
-            name: 'ipconfig01'
-            subnetResourceId: virtualNetwork!.outputs.jumpboxSubnetResourceId
-          }
-        ]
-      }
-    ]
-    osDisk: {
-      caching: 'ReadWrite'
-      diskSizeGB: 128
-      managedDisk: {
-        storageAccountType: 'Premium_LRS'
-      }
-    }
-    encryptionAtHost: false // Some Azure subscriptions do not support encryption at host
-    extensionMonitoringAgentConfig: {
-      enabled: enableMonitoring
-      dataCollectionRuleAssociations: enableMonitoring ? [
-        {
-          name: 'dcra-${jumpboxVmName}'
-          dataCollectionRuleResourceId: jumpboxDcr!.outputs.resourceId
-          description: 'Associates the Windows security event DCR with the jumpbox VM.'
-        }
-      ] : []
-    }
-    location: solutionLocation
-    tags: tags
-  }
-  dependsOn: (enableMonitoring && !useExistingLogAnalytics) ? [logAnalyticsWorkspace, jumpboxDcr] : (enableMonitoring ? [jumpboxDcr] : [])
-}
-
-// ========== Data Collection Rule for Jumpbox Security Event Logs (SFI-AzTBv17) ========== //
-var jumpboxDcrName = take('dcr-${jumpboxVmName}', 64)
-var dcrLogAnalyticsDestinationName = 'la-${logAnalyticsWorkspaceResourceName}-destination'
-module jumpboxDcr 'br/public:avm/res/insights/data-collection-rule:0.11.0' = if (deployAdminAccessResources && enableMonitoring) {
-  name: take('avm.res.insights.data-collection-rule.${jumpboxDcrName}', 64)
-  params: {
-    name: jumpboxDcrName
-    location: solutionLocation
-    tags: tags
-    enableTelemetry: enableTelemetry
-    dataCollectionRuleProperties: {
-      kind: 'Windows'
-      description: 'Collects Windows Security audit success/failure events from jumpbox VM (SFI-AzTBv17 compliance).'
-      dataSources: {
-        windowsEventLogs: [
-          {
-            name: 'securityEventLogsDataSource'
-            streams: [
-              'Microsoft-SecurityEvent'
-            ]
-            xPathQueries: [
-              'Security!*[System[(band(Keywords,13510798882111488)) and (EventID != 4624)]]'
-            ]
-          }
-        ]
-      }
-      destinations: {
-        logAnalytics: [
-          {
-            name: dcrLogAnalyticsDestinationName
-            workspaceResourceId: logAnalyticsWorkspaceResourceId
-          }
-        ]
-      }
-      dataFlows: [
-        {
-          streams: [
-            'Microsoft-SecurityEvent'
-          ]
-          destinations: [
-            dcrLogAnalyticsDestinationName
-          ]
-        }
-      ]
-    }
-  }
-}
-
-
-
-// ========== Private DNS Zones ========== //
-// Only create DNS zones for resources that need private endpoints:
-// - Cognitive Services (for AI Services)
-// - OpenAI (for Azure OpenAI endpoints)
-// - Blob Storage
-// - Cosmos DB (Documents)
-var privateDnsZones = [
-  'privatelink.cognitiveservices.azure.com'
-  'privatelink.openai.azure.com'
-  'privatelink.blob.${environment().suffixes.storage}'
-  'privatelink.documents.azure.com'
-]
-
-var dnsZoneIndex = {
-  cognitiveServices: 0
-  openAI: 1
-  storageBlob: 2
-  cosmosDB: 3
-}
-
-@batchSize(5)
-module avmPrivateDnsZones 'br/public:avm/res/network/private-dns-zone:0.8.1' = [
-  for (zone, i) in privateDnsZones: if (enablePrivateNetworking) {
-    name: take('avm.res.network.private-dns-zone.${replace(zone, '.', '-')}', 64)
-    params: {
-      name: zone
-      tags: tags
-      enableTelemetry: enableTelemetry
-      virtualNetworkLinks: [
-        {
-          virtualNetworkResourceId: enablePrivateNetworking ? virtualNetwork!.outputs.resourceId : ''
-          registrationEnabled: false
-        }
-      ]
-    }
-  }
-]
-
-// ========== AI Foundry: AI Services ========== //
-module aiFoundryAiServices 'br/public:avm/res/cognitive-services/account:0.14.2'  = if (!useExistingAiFoundryAiProject) {
-  name: take('avm.res.cognitive-services.account.${aiFoundryAiServicesResourceName}', 64)
-  params: {
-    name: aiFoundryAiServicesResourceName
-    location: azureAiServiceLocation
-    tags: tags
-    enableTelemetry: enableTelemetry
-    sku: 'S0'
-    kind: 'AIServices'
-    disableLocalAuth: true
-    allowProjectManagement: true
-    customSubDomainName: aiFoundryAiServicesResourceName
-    restrictOutboundNetworkAccess: false
-    deployments: [
-      for deployment in aiFoundryAiServicesModelDeployment: {
-        name: deployment.name
-        model: {
-          format: deployment.format
-          name: deployment.name
-          version: deployment.version
-        }
-        raiPolicyName: deployment.raiPolicyName
-        sku: {
-          name: deployment.sku.name
-          capacity: deployment.sku.capacity
-        }
-      }
-    ]
-    networkAcls: {
-      defaultAction: 'Allow'
-      virtualNetworkRules: []
-      ipRules: []
-    }
-    managedIdentities: {
-      userAssignedResourceIds: [userAssignedIdentity!.outputs.resourceId]
-    }
-    roleAssignments: [
-      {
-        roleDefinitionIdOrName: '53ca6127-db72-4b80-b1b0-d745d6d5456d' // Foundry User
-        principalId: userAssignedIdentity.outputs.principalId
-        principalType: 'ServicePrincipal'
-      }
-      {
-        roleDefinitionIdOrName: '64702f94-c441-49e6-a78b-ef80e0188fee' // Azure AI Developer
-        principalId: userAssignedIdentity.outputs.principalId
-        principalType: 'ServicePrincipal'
-      }
-      {
-        roleDefinitionIdOrName: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd' // Cognitive Services OpenAI User
-        principalId: userAssignedIdentity.outputs.principalId
-        principalType: 'ServicePrincipal'
-      }
-      {
-        roleDefinitionIdOrName: '53ca6127-db72-4b80-b1b0-d745d6d5456d' // Foundry User for deployer
-        principalId: deployer().objectId
-      }
-    ]
-    diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
-    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
-    // Note: Private endpoint is created separately to avoid timing issues with model deployments
-  }
-}
-
-// Create private endpoint for AI Services AFTER the account is fully provisioned
-module aiServicesPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.0' = if (!useExistingAiFoundryAiProject && enablePrivateNetworking) {
-  name: take('pep-ai-services-${aiFoundryAiServicesResourceName}', 64)
-  params: {
-    name: 'pep-${aiFoundryAiServicesResourceName}'
-    location: solutionLocation
-    tags: tags
-    enableTelemetry: enableTelemetry
-    subnetResourceId: virtualNetwork!.outputs.pepsSubnetResourceId
-    privateLinkServiceConnections: [
-      {
-        name: 'pep-${aiFoundryAiServicesResourceName}'
-        properties: {
-          privateLinkServiceId: aiFoundryAiServices!.outputs.resourceId
-          groupIds: ['account']
-        }
-      }
-    ]
-    privateDnsZoneGroup: {
-      privateDnsZoneGroupConfigs: [
-        {
-          name: 'cognitiveservices'
-          privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.cognitiveServices]!.outputs.resourceId
-        }
-        {
-          name: 'openai'
-          privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.openAI]!.outputs.resourceId
-        }
-      ]
-    }
-  }
-}
-
-module aiFoundryAiServicesProject 'modules/ai-project.bicep' = if (!useExistingAiFoundryAiProject) {
-  name: take('module.ai-project.${aiFoundryAiProjectResourceName}', 64)
-  params: {
-    name: aiFoundryAiProjectResourceName
-    location: azureAiServiceLocation
-    tags: tags
-    desc: aiFoundryAiProjectDescription
-    aiServicesName: aiFoundryAiServicesResourceName
+    solutionName: solutionName
+    solutionUniqueText: solutionUniqueText
+    location: location
+    secondaryLocation: secondaryLocation
+    azureAiServiceLocation: azureAiServiceLocation
+    gptModelDeploymentType: gptModelDeploymentType
+    gptModelName: gptModelName
+    gptModelVersion: gptModelVersion
+    imageModelChoice: imageModelChoice
+    azureOpenaiAPIVersion: azureOpenaiAPIVersion
+    gptModelCapacity: gptModelCapacity
+    imageModelCapacity: imageModelCapacity
+    existingLogAnalyticsWorkspaceId: existingLogAnalyticsWorkspaceId
     azureExistingAIProjectResourceId: azureExistingAIProjectResourceId
-  }
-  dependsOn: [
-    aiFoundryAiServices
-  ]
-}
-
-var aiFoundryAiProjectEndpoint = useExistingAiFoundryAiProject
-  ? 'https://${aiFoundryAiServicesResourceName}.services.ai.azure.com/api/projects/${aiFoundryAiProjectResourceName}'
-  : aiFoundryAiServicesProject!.outputs.apiEndpoint
-
-// ========== Role Assignments for Existing AI Services ========== //
-module existingAiServicesRoleAssignments 'modules/deploy_foundry_role_assignment.bicep' = if (useExistingAiFoundryAiProject) {
-  name: take('module.foundry-role-assignment.${aiFoundryAiServicesResourceName}', 64)
-  scope: resourceGroup(aiFoundryAiServicesSubscriptionId, aiFoundryAiServicesResourceGroupName)
-  params: {
-    aiServicesName: aiFoundryAiServicesResourceName
-    principalId: userAssignedIdentity.outputs.principalId
-    principalType: 'ServicePrincipal'
-  }
-}
-
-// ========== Model Deployments for Existing AI Services ========== //
-module existingAiServicesModelDeployments 'modules/deploy_ai_model.bicep' = if (useExistingAiFoundryAiProject) {
-  name: take('module.model-deployments-existing.${aiFoundryAiServicesResourceName}', 64)
-  scope: resourceGroup(aiFoundryAiServicesSubscriptionId, aiFoundryAiServicesResourceGroupName)
-  params: {
-    aiServicesName: aiFoundryAiServicesResourceName
-    deployments: [
-      for deployment in aiFoundryAiServicesModelDeployment: {
-        name: deployment.name
-        format: deployment.format
-        model: deployment.model
-        sku: {
-          name: deployment.sku.name
-          capacity: deployment.sku.capacity
-        }
-        version: deployment.version
-        raiPolicyName: deployment.raiPolicyName
-      }
-    ]
-  }
-  dependsOn: [
-    existingAiServicesRoleAssignments
-  ]
-}
-
-// ========== AI Search ========== //
-module aiSearch 'br/public:avm/res/search/search-service:0.12.0' = {
-  name: take('avm.res.search.search-service.${aiSearchName}', 64)
-  params: {
-    name: aiSearchName
-    location: solutionLocation
+    useFoundryMode: useFoundryMode
+    deployBastionAndJumpbox: deployBastionAndJumpbox
+    vmSize: vmSize
+    vmAdminUsername: vmAdminUsername
+    vmAdminPassword: vmAdminPassword
     tags: tags
-    enableTelemetry: enableTelemetry
-    sku: enableScalability ? 'standard' : 'basic'
-    replicaCount: enableRedundancy ? 3 : 1
-    partitionCount: 1
-    hostingMode: 'Default'
-    semanticSearch: 'free'
-    managedIdentities: { systemAssigned: true }
-    disableLocalAuth: true
-    roleAssignments: [
-      {
-        principalId: userAssignedIdentity.outputs.principalId
-        roleDefinitionIdOrName: 'Search Index Data Contributor'
-        principalType: 'ServicePrincipal'
-      }
-      {
-        principalId: userAssignedIdentity.outputs.principalId
-        roleDefinitionIdOrName: 'Search Service Contributor'
-        principalType: 'ServicePrincipal'
-      }
-    ]
-    diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
-    // AI Search remains publicly accessible - accessed from ACI via managed identity
-    publicNetworkAccess: 'Enabled'
-  }
-}
-
-// ========== Storage Account ========== //
-var storageAccountName = 'st${solutionSuffix}'
-var productImagesContainer = 'product-images'
-var generatedImagesContainer = 'generated-images'
-
-module storageAccount 'br/public:avm/res/storage/storage-account:0.32.0' = {
-  name: take('avm.res.storage.storage-account.${storageAccountName}', 64)
-  params: {
-    name: storageAccountName
-    location: solutionLocation
-    skuName: enableRedundancy ? 'Standard_ZRS' : 'Standard_LRS'
-    managedIdentities: { systemAssigned: true }
-    minimumTlsVersion: 'TLS1_2'
-    requireInfrastructureEncryption: true
-    enableTelemetry: enableTelemetry
-    tags: tags
-    accessTier: 'Hot'
-    supportsHttpsTrafficOnly: true
-    blobServices: {
-      containerDeleteRetentionPolicyEnabled: true
-      containerDeleteRetentionPolicyDays: 7
-      deleteRetentionPolicyEnabled: true
-      deleteRetentionPolicyDays: 7
-      containers: [
-        {
-          name: productImagesContainer
-          publicAccess: 'None'
-        }
-        {
-          name: generatedImagesContainer
-          publicAccess: 'None'
-        }
-      ]
-    }
-    roleAssignments: [
-      {
-        principalId: userAssignedIdentity.outputs.principalId
-        roleDefinitionIdOrName: 'Storage Blob Data Contributor'
-        principalType: 'ServicePrincipal'
-      }
-    ]
-    networkAcls: {
-      bypass: 'AzureServices'
-      defaultAction: enablePrivateNetworking ? 'Deny' : 'Allow'
-    }
-    allowBlobPublicAccess: false
-    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
-    privateEndpoints: enablePrivateNetworking
-      ? [
-          {
-            service: 'blob'
-            subnetResourceId: virtualNetwork!.outputs.pepsSubnetResourceId
-            privateDnsZoneGroup: {
-              privateDnsZoneGroupConfigs: [
-                { privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.storageBlob]!.outputs.resourceId }
-              ]
-            }
-          }
-        ]
-      : null
-    diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
-  }
-}
-
-// ========== Cosmos DB ========== //
-var cosmosDBResourceName = 'cosmos-${solutionSuffix}'
-var cosmosDBDatabaseName = 'content_generation_db'
-var cosmosDBConversationsContainer = 'conversations'
-var cosmosDBProductsContainer = 'products'
-
-module cosmosDB 'br/public:avm/res/document-db/database-account:0.19.0' = {
-  name: take('avm.res.document-db.database-account.${cosmosDBResourceName}', 64)
-  params: {
-    name: 'cosmos-${solutionSuffix}'
-    location: secondaryLocation
-    tags: tags
-    enableTelemetry: enableTelemetry
-    sqlDatabases: [
-      {
-        name: cosmosDBDatabaseName
-        containers: [
-          {
-            name: cosmosDBConversationsContainer
-            paths: [
-              '/userId'
-            ]
-          }
-          {
-            name: cosmosDBProductsContainer
-            paths: [
-              '/category'
-            ]
-          }
-        ]
-      }
-    ]
-    sqlRoleDefinitions: [
-      {
-        roleName: 'contentgen-data-contributor'
-        dataActions: [
-          'Microsoft.DocumentDB/databaseAccounts/readMetadata'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*'
-        ]
-      }
-    ]
-    sqlRoleAssignments: [
-      {
-        principalId: userAssignedIdentity.outputs.principalId
-        roleDefinitionId: '00000000-0000-0000-0000-000000000002' // Built-in Cosmos DB Data Contributor
-      }
-      {
-        principalId: deployer().objectId
-        roleDefinitionId: '00000000-0000-0000-0000-000000000002' // Built-in Cosmos DB Data Contributor to the deployer
-      }
-    ]
-    diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
-    networkRestrictions: {
-      networkAclBypass: 'AzureServices'
-      publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
-    }
-    zoneRedundant: enableRedundancy
-    capabilitiesToAdd: enableRedundancy ? null : ['EnableServerless']
-    enableAutomaticFailover: enableRedundancy
-    failoverLocations: enableRedundancy
-      ? [
-          {
-            failoverPriority: 0
-            isZoneRedundant: true
-            locationName: secondaryLocation
-          }
-          {
-            failoverPriority: 1
-            isZoneRedundant: true
-            locationName: cosmosDbHaLocation
-          }
-        ]
-      : [
-          {
-            locationName: secondaryLocation
-            failoverPriority: 0
-            isZoneRedundant: false
-          }
-        ]
-    privateEndpoints: enablePrivateNetworking
-      ? [
-          {
-            service: 'Sql'
-            subnetResourceId: virtualNetwork!.outputs.pepsSubnetResourceId
-            privateDnsZoneGroup: {
-              privateDnsZoneGroupConfigs: [
-                { privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.cosmosDB]!.outputs.resourceId }
-              ]
-            }
-          }
-        ]
-      : null
-  }
-}
-
-// ========== App Service Plan ========== //
-var webServerFarmResourceName = 'asp-${solutionSuffix}'
-module webServerFarm 'br/public:avm/res/web/serverfarm:0.7.0' = {
-  name: take('avm.res.web.serverfarm.${webServerFarmResourceName}', 64)
-  params: {
-    name: webServerFarmResourceName
-    tags: tags
-    enableTelemetry: enableTelemetry
-    location: solutionLocation
-    reserved: true
-    kind: 'linux'
-    diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
-    skuName: enableScalability || enableRedundancy ? 'P1v3' : 'B1'
-    skuCapacity: enableRedundancy ? 2 : 1
-    zoneRedundant: enableRedundancy ? true : false
-  }
-  scope: resourceGroup(resourceGroup().name)
-}
-
-// ========== Web App ========== //
-var webSiteResourceName = 'app-${solutionSuffix}'
-// Backend URL: Use actual ACI IP/FQDN from deployment outputs
-// This also creates an implicit dependency ensuring ACI deploys before the web app
-var aciBackendUrl = enablePrivateNetworking
-  ? 'http://${containerInstance.outputs.ipAddress}:8000'
-  : 'http://${containerInstance.outputs.fqdn}:8000'
-module webSite 'modules/web-sites.bicep' = {
-  name: take('module.web-sites.${webSiteResourceName}', 64)
-  params: {
-    name: webSiteResourceName
-    tags: tags
-    location: solutionLocation
-    kind: 'app,linux,container'
-    serverFarmResourceId: webServerFarm.outputs.resourceId
-    managedIdentities: { userAssignedResourceIds: [userAssignedIdentity!.outputs.resourceId] }
-    siteConfig: {
-      // Frontend container - same for both modes
-      linuxFxVersion: 'DOCKER|${acrResourceName}.azurecr.io/content-gen-app:${imageTag}'
-      minTlsVersion: '1.2'
-      alwaysOn: true
-      ftpsState: 'FtpsOnly'
-    }
-    virtualNetworkSubnetId: enablePrivateNetworking ? virtualNetwork!.outputs.webSubnetResourceId : null
-    configs: concat(
-      [
-        {
-          // Frontend container proxies to ACI backend (both modes)
-          name: 'appsettings'
-          properties: {
-            DOCKER_REGISTRY_SERVER_URL: 'https://${acrResourceName}.azurecr.io'
-            BACKEND_URL: aciBackendUrl
-            AZURE_CLIENT_ID: userAssignedIdentity.outputs.clientId
-          }
-          applicationInsightResourceId: enableMonitoring ? applicationInsights!.outputs.resourceId : null
-        }
-      ],
-      enableMonitoring
-        ? [
-            {
-              name: 'logs'
-              properties: {}
-            }
-          ]
-        : []
-    )
     enableMonitoring: enableMonitoring
+    enableScalability: enableScalability
+    enableRedundancy: enableRedundancy
+    enablePrivateNetworking: enablePrivateNetworking
+    acrName: acrName
+    imageTag: imageTag
     enableTelemetry: enableTelemetry
-    diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
-    vnetRouteAllEnabled: enablePrivateNetworking
-    vnetImagePullEnabled: enablePrivateNetworking
-    e2eEncryptionEnabled: true
-    publicNetworkAccess: 'Enabled'
+    createdBy: createdBy
   }
 }
 
-// ========== Container Instance (Backend API) ========== //
-var containerInstanceName = 'aci-${solutionSuffix}'
-module containerInstance 'modules/container-instance.bicep' = {
-  name: take('module.container-instance.${containerInstanceName}', 64)
+// ============================================================================
+// Module: Bicep Deployment (Docker build, creates ACR)
+// ============================================================================
+
+module bicepDeployment './bicep/main.bicep' = if (isBicep) {
+  name: take('module.bicep.${solutionName}', 64)
   params: {
-    name: containerInstanceName
-    location: solutionLocation
+    solutionName: solutionName
+    solutionUniqueText: solutionUniqueText
+    location: location
+    secondaryLocation: secondaryLocation
+    azureAiServiceLocation: azureAiServiceLocation
+    gptModelDeploymentType: gptModelDeploymentType
+    gptModelName: gptModelName
+    gptModelVersion: gptModelVersion
+    imageModelChoice: imageModelChoice
+    azureOpenaiAPIVersion: azureOpenaiAPIVersion
+    gptModelCapacity: gptModelCapacity
+    imageModelCapacity: imageModelCapacity
+    existingLogAnalyticsWorkspaceId: existingLogAnalyticsWorkspaceId
+    azureExistingAIProjectResourceId: azureExistingAIProjectResourceId
+    useFoundryMode: useFoundryMode
+    deployBastionAndJumpbox: deployBastionAndJumpbox
+    vmSize: vmSize
+    vmAdminUsername: vmAdminUsername
+    vmAdminPassword: vmAdminPassword
     tags: tags
-    containerImage: '${acrResourceName}.azurecr.io/content-gen-api:${imageTag}'
-    cpu: 2
-    memoryInGB: 4
-    port: 8000
-    // Only pass subnetResourceId when private networking is enabled
-    subnetResourceId: enablePrivateNetworking ? virtualNetwork!.outputs.aciSubnetResourceId : ''
-    userAssignedIdentityResourceId: userAssignedIdentity.outputs.resourceId
+    enableMonitoring: enableMonitoring
+    enableScalability: enableScalability
+    enableRedundancy: enableRedundancy
+    enablePrivateNetworking: enablePrivateNetworking
+    imageTag: imageTag
+    frontendImageName: frontendImageName
+    backendImageName: backendImageName
     enableTelemetry: enableTelemetry
-    environmentVariables: [
-      // Azure OpenAI Settings
-      { name: 'AZURE_OPENAI_ENDPOINT', value: 'https://${aiFoundryAiServicesResourceName}.openai.azure.com/' }
-      { name: 'AZURE_ENV_GPT_MODEL_NAME', value: gptModelName }
-      { name: 'AZURE_ENV_IMAGE_MODEL_NAME', value: imageModelConfig[imageModelChoice].name }
-      { name: 'AZURE_OPENAI_GPT_IMAGE_ENDPOINT', value: imageModelChoice != 'none' ? 'https://${aiFoundryAiServicesResourceName}.openai.azure.com/' : '' }
-      { name: 'AZURE_ENV_OPENAI_API_VERSION', value: azureOpenaiAPIVersion }
-      // Azure Cosmos DB Settings
-      { name: 'AZURE_COSMOS_ENDPOINT', value: 'https://cosmos-${solutionSuffix}.documents.azure.com:443/' }
-      { name: 'AZURE_COSMOS_DATABASE_NAME', value: cosmosDBDatabaseName }
-      { name: 'AZURE_COSMOS_PRODUCTS_CONTAINER', value: cosmosDBProductsContainer }
-      { name: 'AZURE_COSMOS_CONVERSATIONS_CONTAINER', value: cosmosDBConversationsContainer }
-      // Azure Blob Storage Settings
-      { name: 'AZURE_BLOB_ACCOUNT_NAME', value: storageAccountName }
-      { name: 'AZURE_BLOB_PRODUCT_IMAGES_CONTAINER', value: productImagesContainer }
-      { name: 'AZURE_BLOB_GENERATED_IMAGES_CONTAINER', value: generatedImagesContainer }
-      // Azure AI Search Settings
-      { name: 'AZURE_AI_SEARCH_ENDPOINT', value: 'https://${aiSearchName}.search.windows.net' }
-      { name: 'AZURE_AI_SEARCH_PRODUCTS_INDEX', value: azureSearchIndex }
-      { name: 'AZURE_AI_SEARCH_IMAGE_INDEX', value: 'product-images' }
-      // App Settings
-      { name: 'AZURE_CLIENT_ID', value: userAssignedIdentity.outputs.clientId }
-      { name: 'PORT', value: '8000' }
-      { name: 'WORKERS', value: '4' }
-      { name: 'RUNNING_IN_PRODUCTION', value: 'true' }
-      // Azure AI Foundry Settings
-      { name: 'USE_FOUNDRY', value: useFoundryMode ? 'true' : 'false' }
-      { name: 'AZURE_AI_PROJECT_ENDPOINT', value: aiFoundryAiProjectEndpoint }
-      { name: 'AZURE_AI_MODEL_DEPLOYMENT_NAME', value: gptModelName }
-      { name: 'AZURE_AI_IMAGE_MODEL_DEPLOYMENT', value: imageModelConfig[imageModelChoice].name }
-      // Logging Settings
-      { name: 'AZURE_BASIC_LOGGING_LEVEL', value: 'INFO' }
-      { name: 'AZURE_PACKAGE_LOGGING_LEVEL', value: 'WARNING' }
-      { name: 'AZURE_LOGGING_PACKAGES', value: '' }
-      // Application Insights
-      { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: enableMonitoring ? applicationInsights!.outputs.connectionString : '' }
-    ]
+    createdBy: createdBy
   }
 }
 
-// ========== Outputs ========== //
+// ============================================================================
+// Outputs — Coalesced from whichever flavor was deployed
+// ============================================================================
+
+@description('Deployment flavor used.')
+output DEPLOYMENT_FLAVOR string = deploymentFlavor
+
 @description('Contains App Service Name')
-output APP_SERVICE_NAME string = webSite.outputs.name
+output APP_SERVICE_NAME string = isAvm ? avmDeployment!.outputs.APP_SERVICE_NAME : bicepDeployment!.outputs.APP_SERVICE_NAME
 
 @description('Contains WebApp URL')
-output WEB_APP_URL string = 'https://${webSite.outputs.name}.azurewebsites.net'
+output WEB_APP_URL string = isAvm ? avmDeployment!.outputs.WEB_APP_URL : bicepDeployment!.outputs.WEB_APP_URL
 
 @description('Contains Storage Account Name')
-output AZURE_BLOB_ACCOUNT_NAME string = storageAccount.outputs.name
+output AZURE_BLOB_ACCOUNT_NAME string = isAvm ? avmDeployment!.outputs.AZURE_BLOB_ACCOUNT_NAME : bicepDeployment!.outputs.AZURE_BLOB_ACCOUNT_NAME
 
 @description('Contains Product Images Container')
-output AZURE_BLOB_PRODUCT_IMAGES_CONTAINER string = productImagesContainer
+output AZURE_BLOB_PRODUCT_IMAGES_CONTAINER string = isAvm ? avmDeployment!.outputs.AZURE_BLOB_PRODUCT_IMAGES_CONTAINER : bicepDeployment!.outputs.AZURE_BLOB_PRODUCT_IMAGES_CONTAINER
 
 @description('Contains Generated Images Container')
-output AZURE_BLOB_GENERATED_IMAGES_CONTAINER string = generatedImagesContainer
+output AZURE_BLOB_GENERATED_IMAGES_CONTAINER string = isAvm ? avmDeployment!.outputs.AZURE_BLOB_GENERATED_IMAGES_CONTAINER : bicepDeployment!.outputs.AZURE_BLOB_GENERATED_IMAGES_CONTAINER
 
-@description('Contains CosmosDB Account Name')
-output COSMOSDB_ACCOUNT_NAME string = cosmosDB.outputs.name
+@description('Contains Cosmos DB Account Name')
+output COSMOSDB_ACCOUNT_NAME string = isAvm ? avmDeployment!.outputs.COSMOSDB_ACCOUNT_NAME : bicepDeployment!.outputs.COSMOSDB_ACCOUNT_NAME
 
-@description('Contains CosmosDB Endpoint URL')
-output AZURE_COSMOS_ENDPOINT string = 'https://cosmos-${solutionSuffix}.documents.azure.com:443/'
+@description('Contains Cosmos DB Endpoint')
+output AZURE_COSMOS_ENDPOINT string = isAvm ? avmDeployment!.outputs.AZURE_COSMOS_ENDPOINT : bicepDeployment!.outputs.AZURE_COSMOS_ENDPOINT
 
-@description('Contains CosmosDB Database Name')
-output AZURE_COSMOS_DATABASE_NAME string = cosmosDBDatabaseName
+@description('Contains Cosmos DB Database Name')
+output AZURE_COSMOS_DATABASE_NAME string = isAvm ? avmDeployment!.outputs.AZURE_COSMOS_DATABASE_NAME : bicepDeployment!.outputs.AZURE_COSMOS_DATABASE_NAME
 
-@description('Contains CosmosDB Products Container')
-output AZURE_COSMOS_PRODUCTS_CONTAINER string = cosmosDBProductsContainer
+@description('Contains Cosmos DB Products Container')
+output AZURE_COSMOS_PRODUCTS_CONTAINER string = isAvm ? avmDeployment!.outputs.AZURE_COSMOS_PRODUCTS_CONTAINER : bicepDeployment!.outputs.AZURE_COSMOS_PRODUCTS_CONTAINER
 
-@description('Contains CosmosDB Conversations Container')
-output AZURE_COSMOS_CONVERSATIONS_CONTAINER string = cosmosDBConversationsContainer
+@description('Contains Cosmos DB Conversations Container')
+output AZURE_COSMOS_CONVERSATIONS_CONTAINER string = isAvm ? avmDeployment!.outputs.AZURE_COSMOS_CONVERSATIONS_CONTAINER : bicepDeployment!.outputs.AZURE_COSMOS_CONVERSATIONS_CONTAINER
 
 @description('Contains Resource Group Name')
 output RESOURCE_GROUP_NAME string = resourceGroup().name
 
 @description('Contains AI Foundry Resource ID')
-output AI_FOUNDRY_RESOURCE_ID string = useExistingAiFoundryAiProject ? '' : aiFoundryAiServices!.outputs.resourceId
+output AI_FOUNDRY_RESOURCE_ID string = isAvm ? avmDeployment!.outputs.AI_FOUNDRY_RESOURCE_ID : bicepDeployment!.outputs.AI_FOUNDRY_RESOURCE_ID
 
-@description('Contains existing AI project resource ID.')
-output AZURE_EXISTING_AIPROJECT_RESOURCE_ID string = azureExistingAIProjectResourceId
+@description('Contains Existing AI Project Resource ID')
+output AZURE_EXISTING_AIPROJECT_RESOURCE_ID string = isAvm ? avmDeployment!.outputs.AZURE_EXISTING_AIPROJECT_RESOURCE_ID : bicepDeployment!.outputs.AZURE_EXISTING_AIPROJECT_RESOURCE_ID
 
-@description('Contains AI Search Service Endpoint URL')
-output AZURE_AI_SEARCH_ENDPOINT string = 'https://${aiSearch.outputs.name}.search.windows.net/'
+@description('Contains AI Search Endpoint')
+output AZURE_AI_SEARCH_ENDPOINT string = isAvm ? avmDeployment!.outputs.AZURE_AI_SEARCH_ENDPOINT : bicepDeployment!.outputs.AZURE_AI_SEARCH_ENDPOINT
 
 @description('Contains AI Search Service Name')
-output AI_SEARCH_SERVICE_NAME string = aiSearch.outputs.name
+output AI_SEARCH_SERVICE_NAME string = isAvm ? avmDeployment!.outputs.AI_SEARCH_SERVICE_NAME : bicepDeployment!.outputs.AI_SEARCH_SERVICE_NAME
 
-@description('Contains AI Search Product Index')
-output AZURE_AI_SEARCH_PRODUCTS_INDEX string = azureSearchIndex
+@description('Contains AI Search Products Index')
+output AZURE_AI_SEARCH_PRODUCTS_INDEX string = isAvm ? avmDeployment!.outputs.AZURE_AI_SEARCH_PRODUCTS_INDEX : bicepDeployment!.outputs.AZURE_AI_SEARCH_PRODUCTS_INDEX
 
 @description('Contains AI Search Image Index')
-output AZURE_AI_SEARCH_IMAGE_INDEX string = 'product-images'
+output AZURE_AI_SEARCH_IMAGE_INDEX string = isAvm ? avmDeployment!.outputs.AZURE_AI_SEARCH_IMAGE_INDEX : bicepDeployment!.outputs.AZURE_AI_SEARCH_IMAGE_INDEX
 
-@description('Contains Azure OpenAI endpoint URL')
-output AZURE_OPENAI_ENDPOINT string = 'https://${aiFoundryAiServicesResourceName}.openai.azure.com/'
+@description('Contains Azure OpenAI Endpoint')
+output AZURE_OPENAI_ENDPOINT string = isAvm ? avmDeployment!.outputs.AZURE_OPENAI_ENDPOINT : bicepDeployment!.outputs.AZURE_OPENAI_ENDPOINT
 
-@description('Contains GPT Model')
-output AZURE_ENV_GPT_MODEL_NAME string = gptModelName
+@description('Contains GPT Model Name')
+output AZURE_ENV_GPT_MODEL_NAME string = isAvm ? avmDeployment!.outputs.AZURE_ENV_GPT_MODEL_NAME : bicepDeployment!.outputs.AZURE_ENV_GPT_MODEL_NAME
 
-@description('Contains Image Model (empty if none selected)')
-output AZURE_ENV_IMAGE_MODEL_NAME string = imageModelConfig[imageModelChoice].name
+@description('Contains Image Model Name')
+output AZURE_ENV_IMAGE_MODEL_NAME string = isAvm ? avmDeployment!.outputs.AZURE_ENV_IMAGE_MODEL_NAME : bicepDeployment!.outputs.AZURE_ENV_IMAGE_MODEL_NAME
 
 @description('Contains Azure OpenAI GPT/Image endpoint URL (empty if no image model selected)')
-output AZURE_OPENAI_GPT_IMAGE_ENDPOINT string = imageModelChoice != 'none' ? 'https://${aiFoundryAiServicesResourceName}.openai.azure.com/' : ''
+output AZURE_OPENAI_GPT_IMAGE_ENDPOINT string = isAvm ? avmDeployment!.outputs.AZURE_OPENAI_GPT_IMAGE_ENDPOINT : bicepDeployment!.outputs.AZURE_OPENAI_GPT_IMAGE_ENDPOINT
 
 @description('Contains Azure OpenAI API Version')
-output AZURE_ENV_OPENAI_API_VERSION string = azureOpenaiAPIVersion
+output AZURE_ENV_OPENAI_API_VERSION string = isAvm ? avmDeployment!.outputs.AZURE_ENV_OPENAI_API_VERSION : bicepDeployment!.outputs.AZURE_ENV_OPENAI_API_VERSION
 
 @description('Contains OpenAI Resource')
-output AZURE_OPENAI_RESOURCE string = aiFoundryAiServicesResourceName
+output AZURE_OPENAI_RESOURCE string = isAvm ? avmDeployment!.outputs.AZURE_OPENAI_RESOURCE : bicepDeployment!.outputs.AZURE_OPENAI_RESOURCE
 
 @description('Contains Application Insights Connection String')
-output AZURE_APPLICATION_INSIGHTS_CONNECTION_STRING string = (enableMonitoring && !useExistingLogAnalytics) ? applicationInsights!.outputs.connectionString : ''
+output AZURE_APPLICATION_INSIGHTS_CONNECTION_STRING string = isAvm ? avmDeployment!.outputs.AZURE_APPLICATION_INSIGHTS_CONNECTION_STRING : bicepDeployment!.outputs.AZURE_APPLICATION_INSIGHTS_CONNECTION_STRING
 
 @description('Contains the location used for AI Services deployment')
-output AZURE_ENV_AI_SERVICE_LOCATION string = azureAiServiceLocation
+output AZURE_ENV_AI_SERVICE_LOCATION string = isAvm ? avmDeployment!.outputs.AZURE_ENV_AI_SERVICE_LOCATION : bicepDeployment!.outputs.AZURE_ENV_AI_SERVICE_LOCATION
 
 @description('Contains Container Instance Name')
-output CONTAINER_INSTANCE_NAME string = containerInstance.outputs.name
+output CONTAINER_INSTANCE_NAME string = isAvm ? avmDeployment!.outputs.CONTAINER_INSTANCE_NAME : bicepDeployment!.outputs.CONTAINER_INSTANCE_NAME
 
 @description('Contains Container Instance FQDN (only for non-private networking)')
-output CONTAINER_INSTANCE_FQDN string = enablePrivateNetworking ? '' : containerInstance.outputs.fqdn
+output CONTAINER_INSTANCE_FQDN string = isAvm ? avmDeployment!.outputs.CONTAINER_INSTANCE_FQDN : bicepDeployment!.outputs.CONTAINER_INSTANCE_FQDN
 
 @description('Contains ACR Name')
-output AZURE_ENV_CONTAINER_REGISTRY_NAME string = acrResourceName
+output AZURE_ENV_CONTAINER_REGISTRY_NAME string = isAvm ? avmDeployment!.outputs.AZURE_ENV_CONTAINER_REGISTRY_NAME : bicepDeployment!.outputs.AZURE_ENV_CONTAINER_REGISTRY_NAME
 
 @description('Contains flag for Azure AI Foundry usage')
-output USE_FOUNDRY bool = useFoundryMode ? true : false
+output USE_FOUNDRY bool = isAvm ? avmDeployment!.outputs.USE_FOUNDRY : bicepDeployment!.outputs.USE_FOUNDRY
 
 @description('Contains Azure AI Project Endpoint')
-output AZURE_AI_PROJECT_ENDPOINT string = aiFoundryAiProjectEndpoint
+output AZURE_AI_PROJECT_ENDPOINT string = isAvm ? avmDeployment!.outputs.AZURE_AI_PROJECT_ENDPOINT : bicepDeployment!.outputs.AZURE_AI_PROJECT_ENDPOINT
 
 @description('Contains Azure AI Model Deployment Name')
-output AZURE_AI_MODEL_DEPLOYMENT_NAME string = gptModelName
+output AZURE_AI_MODEL_DEPLOYMENT_NAME string = isAvm ? avmDeployment!.outputs.AZURE_AI_MODEL_DEPLOYMENT_NAME : bicepDeployment!.outputs.AZURE_AI_MODEL_DEPLOYMENT_NAME
 
 @description('Contains Azure AI Image Model Deployment Name (empty if none selected)')
-output AZURE_AI_IMAGE_MODEL_DEPLOYMENT string = imageModelConfig[imageModelChoice].name
+output AZURE_AI_IMAGE_MODEL_DEPLOYMENT string = isAvm ? avmDeployment!.outputs.AZURE_AI_IMAGE_MODEL_DEPLOYMENT : bicepDeployment!.outputs.AZURE_AI_IMAGE_MODEL_DEPLOYMENT
+
+@description('Contains Managed Identity Client ID (bicep flavor only)')
+output AZURE_CLIENT_ID string = isBicep ? bicepDeployment!.outputs.AZURE_CLIENT_ID : ''
+
+@description('Frontend image name')
+output FRONTEND_IMAGE_NAME string = isBicep ? bicepDeployment!.outputs.FRONTEND_IMAGE_NAME : frontendImageName
+
+@description('Backend image name')
+output BACKEND_IMAGE_NAME string = isBicep ? bicepDeployment!.outputs.BACKEND_IMAGE_NAME : backendImageName
+
+@description('Image tag')
+output AZURE_ENV_IMAGE_TAG string = isBicep ? bicepDeployment!.outputs.AZURE_ENV_IMAGE_TAG : imageTag

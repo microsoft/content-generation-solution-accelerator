@@ -87,9 +87,30 @@ azd env new content-gen-dev
 
 ### 3. Choose Deployment Configuration
 
-The [`infra`](../infra) folder contains the [`main.bicep`](../infra/main.bicep) Bicep script, which defines all Azure infrastructure components for this solution.
+The [`infra`](../infra) folder contains the [`main.bicep`](../infra/main.bicep) Bicep script, which acts as a **deployment router** and defines all Azure infrastructure components for this solution.
 
-By default, the `azd up` command uses the [`main.parameters.json`](../infra/main.parameters.json) file to deploy the solution. This file is pre-configured for a **sandbox environment**.
+The infrastructure is organized into categorized modules and selectable deployment **flavors**, driven by the `deploymentFlavor` parameter:
+
+```
+infra/
+├── main.bicep                 # Router — routes to a flavor via `deploymentFlavor`
+├── main.parameters.json       # Sandbox/dev params (deploymentFlavor = avm)
+├── main.waf.parameters.json   # WAF-aligned params (deploymentFlavor = avm-waf)
+├── avm/                        # AVM-based flavor (Azure Verified Modules)
+│   ├── main.bicep              #   Orchestrator (uses an existing ACR with pre-built images)
+│   └── modules/{ai,compute,data,identity,monitoring,networking}/
+└── bicep/                      # Docker-build flavor
+    └── main.bicep              #   Orchestrator (creates its own ACR, AZD builds & pushes images)
+                                #   Reuses the categorized modules under ../avm/modules
+```
+
+| `deploymentFlavor` | Description | Selected by |
+|--------------------|-------------|-------------|
+| `avm` | AVM modules, references an existing Container Registry with pre-built images. Non-WAF. | `main.parameters.json` (default, via `${DEPLOYMENT_FLAVOR=avm}`) |
+| `avm-waf` | Same AVM modules with WAF-aligned features (monitoring, private networking, scalability, jumpbox). | `main.waf.parameters.json` |
+| `bicep` | Builds local source into Docker images, creates a dedicated ACR, deploys backend as a Container Instance. | `azure_custom.yaml` (sets `DEPLOYMENT_FLAVOR=bicep`) |
+
+By default, the `azd up` command uses the [`main.parameters.json`](../infra/main.parameters.json) file to deploy the solution. This file is pre-configured for a **sandbox environment** and uses the `avm` flavor.
 
 For **production deployments**, the repository also provides [`main.waf.parameters.json`](../infra/main.waf.parameters.json), which applies a [Well-Architected Framework (WAF) aligned](https://learn.microsoft.com/en-us/azure/well-architected/) configuration. This can be used for Production scenarios.
 
@@ -332,14 +353,9 @@ In the root directory:
 1. Rename `azure.yaml` to `azure_custom2.yaml`
 2. Rename `azure_custom.yaml` to `azure.yaml`
 
-### Step 2: Rename Infrastructure Files
+> **Note**: `azure_custom.yaml` automatically selects the `bicep` deployment flavor (`DEPLOYMENT_FLAVOR=bicep`), which builds your local source into container images, creates a dedicated Azure Container Registry, and deploys the backend as a Container Instance. No infrastructure file renaming is required — the single [`main.bicep`](../infra/main.bicep) router handles all flavors.
 
-In the `infra` directory:
-
-1. Rename `main.bicep` to `main_custom2.bicep`
-2. Rename `main_custom.bicep` to `main.bicep`
-
-### Step 3: Deploy Changes
+### Step 2: Deploy Changes
 
 Run the deployment command:
 

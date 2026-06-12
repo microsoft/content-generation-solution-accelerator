@@ -33,7 +33,10 @@ hooks:
       shell: pwsh
       run: |
         Write-Host "Preparing deployment..." -ForegroundColor Cyan
-        
+
+        # Custom (Docker build) deployment uses the 'bicep' router flavor
+        azd env set DEPLOYMENT_FLAVOR bicep
+
         # Check if image exists in the ACR (handles fresh deploy AND deployment mode switch)
         $acrName = azd env get-value AZURE_ENV_CONTAINER_REGISTRY_NAME 2>$null
         $global:LASTEXITCODE = 0
@@ -70,7 +73,10 @@ hooks:
       shell: sh
       run: |
         echo "Preparing deployment..."
-        
+
+        # Custom (Docker build) deployment uses the 'bicep' router flavor
+        azd env set DEPLOYMENT_FLAVOR bicep
+
         # Check if image exists in the ACR (handles fresh deploy AND deployment mode switch)
         ACR_NAME=$(azd env get-value AZURE_ENV_CONTAINER_REGISTRY_NAME 2>/dev/null || echo "")
         SKIP_ACI=false
@@ -145,6 +151,7 @@ hooks:
           az deployment group create `
             --resource-group $resourceGroup `
             --template-file ./infra/main.bicep `
+            --parameters deploymentFlavor=bicep `
             --parameters solutionName=$env:AZURE_ENV_NAME `
             --parameters location=$env:AZURE_LOCATION `
             --parameters azureAiServiceLocation=$env:AZURE_ENV_AI_SERVICE_LOCATION `
@@ -212,6 +219,7 @@ hooks:
           if az deployment group create \
             --resource-group "$RESOURCE_GROUP" \
             --template-file ./infra/main.bicep \
+            --parameters deploymentFlavor=bicep \
             --parameters solutionName="$AZURE_ENV_NAME" \
             --parameters location="$AZURE_LOCATION" \
             --parameters azureAiServiceLocation="$AZURE_ENV_AI_SERVICE_LOCATION" \
