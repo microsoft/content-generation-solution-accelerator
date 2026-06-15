@@ -2,8 +2,10 @@
 
 A single :class:`TokenUsageEmitter` is constructed at import time so every
 router/utility shares the same App Insights connection-string resolution and
-static dimensions. Importing this module has no side effects beyond reading
-``APPLICATIONINSIGHTS_CONNECTION_STRING`` and the env vars documented below.
+static dimensions. Beyond reading ``APPLICATIONINSIGHTS_CONNECTION_STRING`` and
+the env vars documented below, constructing that emitter also resolves the
+optional App Insights event sink, which may import
+``azure.monitor.events.extension`` when the package is installed.
 
 Optional environment variables
 ------------------------------

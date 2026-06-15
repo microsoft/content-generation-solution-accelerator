@@ -599,7 +599,7 @@ class _RequestTokenTracker:
         usage = extract_usage_from_dict(response_json.get("usage"))
         if not usage:
             return False
-        if model and agent_name not in self._agent_model_map:
+        if model:
             self._agent_model_map[agent_name] = model
         self._add(agent_name, usage)
         return True
@@ -637,12 +637,10 @@ class _RequestTokenTracker:
             primary_model=primary_model,
             **dims,
         )
-        logger.info(
-            "[TOKEN USAGE] source=%s user=%s conv=%s total=%d (in=%d, out=%d) "
+        logger.debug(
+            "[TOKEN USAGE] source=%s total=%d (in=%d, out=%d) "
             "agents=%s models=%s",
             source,
-            self._user_id,
-            self._conversation_id,
             self.total.total_tokens,
             self.total.input_tokens,
             self.total.output_tokens,

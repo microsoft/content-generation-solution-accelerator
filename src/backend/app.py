@@ -354,7 +354,6 @@ async def _handle_parse_brief(
 
     # Parse the brief
     brief, questions, blocked = await orchestrator.parse_brief(message, user_id=user_id, conversation_id=conversation_id)
-    brief, questions, blocked = await orchestrator.parse_brief(message, user_id=user_id, conversation_id=conversation_id)
 
     if blocked:
         track_event_if_configured("Error_RAI_Check_Failed", {"conversation_id": conversation_id, "user_id": user_id, "status": "Brief parse blocked by RAI"})

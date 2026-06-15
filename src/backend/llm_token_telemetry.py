@@ -177,6 +177,13 @@ def _to_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def _to_int_or_none(value: Any) -> Optional[int]:
+    """Like :func:`_to_int` but preserves ``None`` for missing/absent values."""
+    if value is None:
+        return None
+    return _to_int(value)
+
+
 def _get(obj: Any, key: str, default: Any = None) -> Any:
     """Read an attribute or dict key uniformly."""
     if obj is None:
@@ -321,11 +328,11 @@ def extract_realtime_usage(response_obj: Any) -> Optional[TokenUsage]:
         input_tokens=inp,
         output_tokens=out,
         total_tokens=tot,
-        input_audio_tokens=_to_int(_get(in_details, "audio_tokens")),
-        input_text_tokens=_to_int(_get(in_details, "text_tokens")),
-        input_cached_tokens=_to_int(_get(in_details, "cached_tokens")),
-        output_audio_tokens=_to_int(_get(out_details, "audio_tokens")),
-        output_text_tokens=_to_int(_get(out_details, "text_tokens")),
+        input_audio_tokens=_to_int_or_none(_get(in_details, "audio_tokens")),
+        input_text_tokens=_to_int_or_none(_get(in_details, "text_tokens")),
+        input_cached_tokens=_to_int_or_none(_get(in_details, "cached_tokens")),
+        output_audio_tokens=_to_int_or_none(_get(out_details, "audio_tokens")),
+        output_text_tokens=_to_int_or_none(_get(out_details, "text_tokens")),
     )
     # Only return if at least one non-zero count surfaced.
     if record.has_any or any(
@@ -814,14 +821,13 @@ class TokenUsageEmitter:
             **dimensions,
         )
 
-        self._log.info(
-            "[TOKEN USAGE] agent=%s model=%s input=%d output=%d total=%d %s",
+        self._log.debug(
+            "[TOKEN USAGE] agent=%s model=%s input=%d output=%d total=%d",
             agent_name,
             model_deployment_name,
             usage.input_tokens,
             usage.output_tokens,
             usage.total_tokens,
-            " ".join(f"{k}={v}" for k, v in dimensions.items() if v),
         )
 
 
@@ -886,7 +892,7 @@ class TokenUsageScope(AbstractContextManager):
         """
         start_ns = time.perf_counter_ns()
         try:
-            found = extract_usage(source) or extract_usage_from_stream_chunk(source)
+            found = extract_usage_from_stream_chunk(source)
         except Exception as exc:  # belt + braces; extractors are already safe
             logger.debug("TokenUsageScope.add failed: %s", exc, exc_info=True)
             return None

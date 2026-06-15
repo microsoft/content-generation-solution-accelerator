@@ -127,7 +127,7 @@ class TitleService:
                 agent_name="title_agent",
                 model_deployment_name=deployment,
                 user_id=user_id,
-                session_id=conversation_id,
+                conversation_id=conversation_id,
             ) as scope:
                 response = await self._agent.run(prompt)
                 scope.add(response)
