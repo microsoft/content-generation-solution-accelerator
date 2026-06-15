@@ -248,15 +248,7 @@ module bicepDeployment './bicep/main.bicep' = if (isBicep) {
     existingLogAnalyticsWorkspaceId: existingLogAnalyticsWorkspaceId
     azureExistingAIProjectResourceId: azureExistingAIProjectResourceId
     useFoundryMode: useFoundryMode
-    deployBastionAndJumpbox: deployBastionAndJumpbox
-    vmSize: vmSize
-    vmAdminUsername: vmAdminUsername
-    vmAdminPassword: vmAdminPassword
     tags: tags
-    enableMonitoring: enableMonitoring
-    enableScalability: enableScalability
-    enableRedundancy: enableRedundancy
-    enablePrivateNetworking: enablePrivateNetworking
     imageTag: imageTag
     frontendImageName: frontendImageName
     backendImageName: backendImageName

@@ -1,4 +1,5 @@
 // ========== main.bicep ========== //
+// Vanilla Bicep (Docker) flavor — lean, non-WAF deployment.
 targetScope = 'resourceGroup'
 
 metadata name = 'Intelligent Content Generation Accelerator'
@@ -104,36 +105,11 @@ param existingLogAnalyticsWorkspaceId string = ''
 @description('Optional. Resource ID of an existing Foundry project.')
 param azureExistingAIProjectResourceId string = ''
 
-@description('Optional. Deploy Azure Bastion and Jumpbox resources for private network administration.')
-param deployBastionAndJumpbox bool = false
-
-@description('Optional. Jumpbox VM size. Must support accelerated networking and Premium SSD.')
-param vmSize string = ''
-
-@description('Optional. Jumpbox VM admin username.')
-param vmAdminUsername string = ''
-
-@description('Optional. Jumpbox VM admin password.')
-@secure()
-param vmAdminPassword string = ''
-
 @description('Optional. The tags to apply to all deployed Azure resources.')
 param tags object = {}
 
-@description('Optional. Enable monitoring for applicable resources (WAF-aligned).')
-param enableMonitoring bool = false
-
 @description('Optional. Enable Azure AI Foundry mode for multi-agent orchestration.')
 param useFoundryMode bool = true
-
-@description('Optional. Enable scalability for applicable resources (WAF-aligned).')
-param enableScalability bool = false
-
-@description('Optional. Enable redundancy for applicable resources (WAF-aligned).')
-param enableRedundancy bool = false
-
-@description('Optional. Enable private networking for applicable resources (WAF-aligned).')
-param enablePrivateNetworking bool = false
 
 @description('Optional. Unused in the Docker (bicep) flavor; a dedicated Container Registry is created during deployment. Retained for parameter-file compatibility.')
 #disable-next-line no-unused-params
@@ -171,36 +147,6 @@ var solutionSuffix = toLower(trim(replace(
   '*',
   ''
 )))
-
-var cosmosDbZoneRedundantHaRegionPairs = {
-  australiaeast: 'uksouth'
-  centralus: 'eastus2'
-  eastasia: 'southeastasia'
-  eastus: 'centralus'
-  eastus2: 'centralus'
-  japaneast: 'australiaeast'
-  northeurope: 'westeurope'
-  southeastasia: 'eastasia'
-  uksouth: 'westeurope'
-  westus: 'westus3'
-  westus3: 'westus'
-}
-var cosmosDbHaLocation = cosmosDbZoneRedundantHaRegionPairs[?resourceGroup().location] ?? secondaryLocation
-
-var replicaRegionPairs = {
-  australiaeast: 'australiasoutheast'
-  centralus: 'westus'
-  eastasia: 'japaneast'
-  eastus: 'centralus'
-  eastus2: 'centralus'
-  japaneast: 'eastasia'
-  northeurope: 'westeurope'
-  southeastasia: 'eastasia'
-  uksouth: 'westeurope'
-  westus: 'westus3'
-  westus3: 'westus'
-}
-var replicaLocation = replicaRegionPairs[?resourceGroup().location] ?? secondaryLocation
 
 var azureSearchIndex = 'products'
 var aiSearchName = 'srch-${solutionSuffix}'
@@ -315,7 +261,7 @@ resource resourceGroupTags 'Microsoft.Resources/tags@2025-04-01' = {
       tags,
       {
         TemplateName: 'ContentGen'
-        Type: enablePrivateNetworking ? 'WAF' : 'Non-WAF'
+        Type: 'Non-WAF'
         CreatedBy: createdBy
       }
     )
@@ -324,25 +270,22 @@ resource resourceGroupTags 'Microsoft.Resources/tags@2025-04-01' = {
 
 // ========== Log Analytics Workspace ========== //
 var logAnalyticsWorkspaceResourceName = 'log-${solutionSuffix}'
-module logAnalyticsWorkspace '../avm/modules/monitoring/log-analytics.bicep' = if (enableMonitoring && !useExistingLogAnalytics) {
+module logAnalyticsWorkspace 'modules/monitoring/log-analytics.bicep' = if (!useExistingLogAnalytics) {
   name: take('module.monitoring.log-analytics.${logAnalyticsWorkspaceResourceName}', 64)
   params: {
     name: logAnalyticsWorkspaceResourceName
     tags: tags
     location: solutionLocation
     enableTelemetry: enableTelemetry
-    enableRedundancy: enableRedundancy
-    replicaLocation: replicaLocation
-    enablePrivateNetworking: enablePrivateNetworking
   }
 }
-var logAnalyticsWorkspaceResourceId = useExistingLogAnalytics 
-  ? existingLogAnalyticsWorkspaceId 
-  : (enableMonitoring ? logAnalyticsWorkspace!.outputs.resourceId : '')
+var logAnalyticsWorkspaceResourceId = useExistingLogAnalytics
+  ? existingLogAnalyticsWorkspaceId
+  : logAnalyticsWorkspace!.outputs.resourceId
 
 // ========== Application Insights ========== //
 var applicationInsightsResourceName = 'appi-${solutionSuffix}'
-module applicationInsights '../avm/modules/monitoring/app-insights.bicep' = if (enableMonitoring) {
+module applicationInsights 'modules/monitoring/app-insights.bicep' = {
   name: take('module.monitoring.app-insights.${applicationInsightsResourceName}', 64)
   params: {
     name: applicationInsightsResourceName
@@ -355,7 +298,7 @@ module applicationInsights '../avm/modules/monitoring/app-insights.bicep' = if (
 
 // ========== User Assigned Identity ========== //
 var userAssignedIdentityResourceName = 'id-${solutionSuffix}'
-module userAssignedIdentity '../avm/modules/identity/user-assigned-identity.bicep' = {
+module userAssignedIdentity 'modules/identity/user-assigned-identity.bicep' = {
   name: take('module.identity.user-assigned-identity.${userAssignedIdentityResourceName}', 64)
   params: {
     name: userAssignedIdentityResourceName
@@ -367,7 +310,7 @@ module userAssignedIdentity '../avm/modules/identity/user-assigned-identity.bice
 
 // ========== Azure Container Registry ========== //
 // Docker (bicep) flavor: ACR for remote Docker builds (AZD pushes images here).
-module containerRegistry '../avm/modules/compute/container-registry.bicep' = {
+module containerRegistry 'modules/compute/container-registry.bicep' = {
   name: take('module.compute.container-registry.${acrResourceName}', 64)
   params: {
     name: acrResourceName
@@ -378,122 +321,8 @@ module containerRegistry '../avm/modules/compute/container-registry.bicep' = {
   }
 }
 
-// ========== Virtual Network and Networking Components ========== //
-var deployAdminAccessResources = enablePrivateNetworking && deployBastionAndJumpbox && !empty(vmAdminPassword)
-module virtualNetwork '../avm/modules/networking/virtual-network.bicep' = if (enablePrivateNetworking) {
-  name: take('module.virtualNetwork.${solutionSuffix}', 64)
-  params: {
-    vnetName: 'vnet-${solutionSuffix}'
-    addressPrefixes: ['10.0.0.0/20'] // 4096 addresses (enough for 8 /23 subnets or 16 /24)
-    location: solutionLocation
-    deployBastionAndJumpbox: deployAdminAccessResources
-    tags: tags
-    logAnalyticsWorkspaceId: logAnalyticsWorkspaceResourceId
-    resourceSuffix: solutionSuffix
-    enableTelemetry: enableTelemetry
-  }
-}
-
-// Azure Bastion Host
-var bastionHostName = 'bas-${solutionSuffix}'
-var zoneSupportedJumpboxLocations = [
-  'australiaeast'
-  'centralus'
-  'eastus'
-  'eastus2'
-  'japaneast'
-  'northeurope'
-  'southeastasia'
-  'swedencentral'
-  'uksouth'
-  'westus3'
-]
-module bastionHost '../avm/modules/networking/bastion-host.bicep' = if (deployAdminAccessResources) {
-  name: take('module.networking.bastion-host.${bastionHostName}', 64)
-  params: {
-    name: bastionHostName
-    location: solutionLocation
-    virtualNetworkResourceId: virtualNetwork!.outputs.resourceId
-    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceResourceId
-    tags: tags
-    enableTelemetry: enableTelemetry
-  }
-}
-
-// Jumpbox Virtual Machine
-var jumpboxUniqueToken = take(uniqueString(resourceGroup().id, solutionSuffix), 10)
-var jumpboxVmName = take('vm-${jumpboxUniqueToken}', 15)
-module jumpboxVM '../avm/modules/compute/virtual-machine.bicep' = if (deployAdminAccessResources) {
-  name: take('module.compute.virtual-machine.${jumpboxVmName}', 64)
-  params: {
-    name: take(jumpboxVmName, 15)
-    enableTelemetry: enableTelemetry
-    vmSize: empty(vmSize) ? 'Standard_D2s_v5' : vmSize
-    adminUsername: empty(vmAdminUsername) ? 'JumpboxAdminUser' : vmAdminUsername
-    adminPassword: vmAdminPassword
-    userAssignedIdentityResourceId: userAssignedIdentity.outputs.resourceId
-    subnetResourceId: virtualNetwork!.outputs.jumpboxSubnetResourceId
-    availabilityZone: contains(zoneSupportedJumpboxLocations, solutionLocation) ? 1 : -1
-    enableMonitoring: enableMonitoring
-    dataCollectionRuleResourceId: (deployAdminAccessResources && enableMonitoring) ? jumpboxDcr!.outputs.resourceId : ''
-    location: solutionLocation
-    tags: tags
-  }
-  dependsOn: (enableMonitoring && !useExistingLogAnalytics) ? [logAnalyticsWorkspace, jumpboxDcr] : (enableMonitoring ? [jumpboxDcr] : [])
-}
-
-// ========== Data Collection Rule for Jumpbox Security Event Logs (SFI-AzTBv17) ========== //
-var jumpboxDcrName = take('dcr-${jumpboxVmName}', 64)
-var dcrLogAnalyticsDestinationName = 'la-${logAnalyticsWorkspaceResourceName}-destination'
-module jumpboxDcr '../avm/modules/monitoring/data-collection-rule.bicep' = if (deployAdminAccessResources && enableMonitoring) {
-  name: take('module.monitoring.data-collection-rule.${jumpboxDcrName}', 64)
-  params: {
-    name: jumpboxDcrName
-    location: solutionLocation
-    tags: tags
-    enableTelemetry: enableTelemetry
-    workspaceResourceId: logAnalyticsWorkspaceResourceId
-    destinationName: dcrLogAnalyticsDestinationName
-  }
-}
-
-
-
-// ========== Private DNS Zones ========== //
-// Only create DNS zones for resources that need private endpoints:
-// - Cognitive Services (for AI Services)
-// - OpenAI (for Azure OpenAI endpoints)
-// - Blob Storage
-// - Cosmos DB (Documents)
-var privateDnsZones = [
-  'privatelink.cognitiveservices.azure.com'
-  'privatelink.openai.azure.com'
-  'privatelink.blob.${environment().suffixes.storage}'
-  'privatelink.documents.azure.com'
-]
-
-var dnsZoneIndex = {
-  cognitiveServices: 0
-  openAI: 1
-  storageBlob: 2
-  cosmosDB: 3
-}
-
-@batchSize(5)
-module avmPrivateDnsZones '../avm/modules/networking/private-dns-zone.bicep' = [
-  for (zone, i) in privateDnsZones: if (enablePrivateNetworking) {
-    name: take('module.networking.private-dns-zone.${replace(zone, '.', '-')}', 64)
-    params: {
-      name: zone
-      tags: tags
-      enableTelemetry: enableTelemetry
-      virtualNetworkResourceId: enablePrivateNetworking ? virtualNetwork!.outputs.resourceId : ''
-    }
-  }
-]
-
 // ========== AI Foundry: AI Services ========== //
-module aiFoundryAiServices '../avm/modules/ai/ai-foundry-services.bicep'  = if (!useExistingAiFoundryAiProject) {
+module aiFoundryAiServices 'modules/ai/ai-foundry-services.bicep'  = if (!useExistingAiFoundryAiProject) {
   name: take('module.ai.ai-foundry-services.${aiFoundryAiServicesResourceName}', 64)
   params: {
     name: aiFoundryAiServicesResourceName
@@ -504,37 +333,10 @@ module aiFoundryAiServices '../avm/modules/ai/ai-foundry-services.bicep'  = if (
     principalId: userAssignedIdentity.outputs.principalId
     deployerPrincipalId: deployer().objectId
     userAssignedIdentityResourceId: userAssignedIdentity!.outputs.resourceId
-    enableMonitoring: enableMonitoring
-    logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceResourceId
-    enablePrivateNetworking: enablePrivateNetworking
   }
 }
 
-// Create private endpoint for AI Services AFTER the account is fully provisioned
-module aiServicesPrivateEndpoint '../avm/modules/networking/private-endpoint.bicep' = if (!useExistingAiFoundryAiProject && enablePrivateNetworking) {
-  name: take('module.networking.private-endpoint.${aiFoundryAiServicesResourceName}', 64)
-  params: {
-    name: 'pep-${aiFoundryAiServicesResourceName}'
-    location: solutionLocation
-    tags: tags
-    enableTelemetry: enableTelemetry
-    subnetResourceId: virtualNetwork!.outputs.pepsSubnetResourceId
-    targetResourceId: aiFoundryAiServices!.outputs.resourceId
-    groupIds: ['account']
-    privateDnsZoneConfigs: [
-      {
-        name: 'cognitiveservices'
-        privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.cognitiveServices]!.outputs.resourceId
-      }
-      {
-        name: 'openai'
-        privateDnsZoneResourceId: avmPrivateDnsZones[dnsZoneIndex.openAI]!.outputs.resourceId
-      }
-    ]
-  }
-}
-
-module aiFoundryAiServicesProject '../avm/modules/ai/ai-foundry-project.bicep' = if (!useExistingAiFoundryAiProject) {
+module aiFoundryAiServicesProject 'modules/ai/ai-foundry-project.bicep' = if (!useExistingAiFoundryAiProject) {
   name: take('module.ai-project.${aiFoundryAiProjectResourceName}', 64)
   params: {
     name: aiFoundryAiProjectResourceName
@@ -554,7 +356,7 @@ var aiFoundryAiProjectEndpoint = useExistingAiFoundryAiProject
   : aiFoundryAiServicesProject!.outputs.apiEndpoint
 
 // ========== Role Assignments for Existing AI Services ========== //
-module existingAiServicesRoleAssignments '../avm/modules/ai/existing-services-roles.bicep' = if (useExistingAiFoundryAiProject) {
+module existingAiServicesRoleAssignments 'modules/ai/existing-services-roles.bicep' = if (useExistingAiFoundryAiProject) {
   name: take('module.foundry-role-assignment.${aiFoundryAiServicesResourceName}', 64)
   scope: resourceGroup(aiFoundryAiServicesSubscriptionId, aiFoundryAiServicesResourceGroupName)
   params: {
@@ -565,7 +367,7 @@ module existingAiServicesRoleAssignments '../avm/modules/ai/existing-services-ro
 }
 
 // ========== Model Deployments for Existing AI Services ========== //
-module existingAiServicesModelDeployments '../avm/modules/ai/ai-foundry-model-deployment.bicep' = if (useExistingAiFoundryAiProject) {
+module existingAiServicesModelDeployments 'modules/ai/ai-foundry-model-deployment.bicep' = if (useExistingAiFoundryAiProject) {
   name: take('module.model-deployments-existing.${aiFoundryAiServicesResourceName}', 64)
   scope: resourceGroup(aiFoundryAiServicesSubscriptionId, aiFoundryAiServicesResourceGroupName)
   params: {
@@ -590,17 +392,16 @@ module existingAiServicesModelDeployments '../avm/modules/ai/ai-foundry-model-de
 }
 
 // ========== AI Search ========== //
-module aiSearch '../avm/modules/ai/ai-search.bicep' = {
+module aiSearch 'modules/ai/ai-search.bicep' = {
   name: take('module.ai.ai-search.${aiSearchName}', 64)
   params: {
     name: aiSearchName
     location: solutionLocation
     tags: tags
     enableTelemetry: enableTelemetry
-    sku: enableScalability ? 'standard' : 'basic'
-    replicaCount: enableRedundancy ? 3 : 1
+    sku: 'basic'
+    replicaCount: 1
     principalId: userAssignedIdentity.outputs.principalId
-    diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : []
   }
 }
 
@@ -609,12 +410,12 @@ var storageAccountName = 'st${solutionSuffix}'
 var productImagesContainer = 'product-images'
 var generatedImagesContainer = 'generated-images'
 
-module storageAccount '../avm/modules/data/storage-account.bicep' = {
+module storageAccount 'modules/data/storage-account.bicep' = {
   name: take('module.data.storage-account.${storageAccountName}', 64)
   params: {
     name: storageAccountName
     location: solutionLocation
-    skuName: enableRedundancy ? 'Standard_ZRS' : 'Standard_LRS'
+    skuName: 'Standard_LRS'
     enableTelemetry: enableTelemetry
     tags: tags
     containers: [
@@ -628,10 +429,6 @@ module storageAccount '../avm/modules/data/storage-account.bicep' = {
       }
     ]
     principalId: userAssignedIdentity.outputs.principalId
-    enablePrivateNetworking: enablePrivateNetworking
-    subnetResourceId: enablePrivateNetworking ? virtualNetwork!.outputs.pepsSubnetResourceId : ''
-    blobDnsZoneResourceId: enablePrivateNetworking ? avmPrivateDnsZones[dnsZoneIndex.storageBlob]!.outputs.resourceId : ''
-    diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : []
   }
 }
 
@@ -641,7 +438,7 @@ var cosmosDBDatabaseName = 'content_generation_db'
 var cosmosDBConversationsContainer = 'conversations'
 var cosmosDBProductsContainer = 'products'
 
-module cosmosDB '../avm/modules/data/cosmos-db-nosql.bicep' = {
+module cosmosDB 'modules/data/cosmos-db-nosql.bicep' = {
   name: take('module.data.cosmos-db-nosql.${cosmosDBResourceName}', 64)
   params: {
     name: 'cosmos-${solutionSuffix}'
@@ -665,41 +462,31 @@ module cosmosDB '../avm/modules/data/cosmos-db-nosql.bicep' = {
     ]
     principalId: userAssignedIdentity.outputs.principalId
     deployerPrincipalId: deployer().objectId
-    enableRedundancy: enableRedundancy
-    haLocation: cosmosDbHaLocation
-    enablePrivateNetworking: enablePrivateNetworking
-    subnetResourceId: enablePrivateNetworking ? virtualNetwork!.outputs.pepsSubnetResourceId : ''
-    cosmosDnsZoneResourceId: enablePrivateNetworking ? avmPrivateDnsZones[dnsZoneIndex.cosmosDB]!.outputs.resourceId : ''
-    diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : []
   }
 }
 
 // ========== App Service Plan ========== //
 var webServerFarmResourceName = 'asp-${solutionSuffix}'
-module webServerFarm '../avm/modules/compute/app-service-plan.bicep' = {
+module webServerFarm 'modules/compute/app-service-plan.bicep' = {
   name: take('module.compute.app-service-plan.${webServerFarmResourceName}', 64)
   params: {
     name: webServerFarmResourceName
     tags: tags
     enableTelemetry: enableTelemetry
     location: solutionLocation
-    diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : []
-    skuName: enableScalability || enableRedundancy ? 'P1v3' : 'B1'
-    skuCapacity: enableRedundancy ? 2 : 1
-    zoneRedundant: enableRedundancy ? true : false
+    skuName: 'B1'
+    skuCapacity: 1
   }
 }
 
 // ========== Web App ========== //
 var webSiteResourceName = 'app-${solutionSuffix}'
-// Backend URL: Use actual ACI IP/FQDN from deployment outputs
+// Backend URL: Use actual ACI FQDN from deployment outputs
 // This also creates an implicit dependency ensuring ACI deploys before the web app
 var aciBackendUrl = shouldDeployACI
-  ? (enablePrivateNetworking
-    ? 'http://${containerInstance!.properties.ipAddress.ip}:8000'
-    : 'http://${containerInstance!.properties.ipAddress.fqdn}:8000')
+  ? 'http://${containerInstance!.properties.ipAddress.fqdn}:8000'
   : ''
-module webSite '../avm/modules/compute/app-service.bicep' = {
+module webSite 'modules/compute/app-service.bicep' = {
   name: take('module.web-sites.${webSiteResourceName}', 64)
   params: {
     name: webSiteResourceName
@@ -716,35 +503,24 @@ module webSite '../avm/modules/compute/app-service.bicep' = {
       ftpsState: 'FtpsOnly'
       appCommandLine: 'node server.js'
     }
-    virtualNetworkSubnetId: enablePrivateNetworking ? virtualNetwork!.outputs.webSubnetResourceId : null
-    configs: concat(
-      [
-        {
-          // Frontend server proxies to ACI backend
-          name: 'appsettings'
-          properties: {
-            WEBSITES_PORT: '8080'
-            BACKEND_URL: aciBackendUrl
-            AZURE_CLIENT_ID: userAssignedIdentity.outputs.clientId
-            SCM_DO_BUILD_DURING_DEPLOYMENT: 'true' // Run npm install during deployment
-          }
-          applicationInsightResourceId: enableMonitoring ? applicationInsights!.outputs.resourceId : null
+    configs: [
+      {
+        // Frontend server proxies to ACI backend
+        name: 'appsettings'
+        properties: {
+          WEBSITES_PORT: '8080'
+          BACKEND_URL: aciBackendUrl
+          AZURE_CLIENT_ID: userAssignedIdentity.outputs.clientId
+          SCM_DO_BUILD_DURING_DEPLOYMENT: 'true' // Run npm install during deployment
         }
-      ],
-      enableMonitoring
-        ? [
-            {
-              name: 'logs'
-              properties: {}
-            }
-          ]
-        : []
-    )
-    enableMonitoring: enableMonitoring
+        applicationInsightResourceId: applicationInsights.outputs.resourceId
+      }
+      {
+        name: 'logs'
+        properties: {}
+      }
+    ]
     enableTelemetry: enableTelemetry
-    diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
-    vnetRouteAllEnabled: enablePrivateNetworking
-    vnetImagePullEnabled: enablePrivateNetworking
     e2eEncryptionEnabled: true
     publicNetworkAccess: 'Enabled'
   }
@@ -755,7 +531,6 @@ module webSite '../avm/modules/compute/app-service.bicep' = {
 var containerInstanceName = 'aci-${solutionSuffix}'
 var backendImageUrl = '${containerRegistry.outputs.loginServer}/${backendImageName}:${imageTag}'
 var aciPort = 8000
-var isPrivateNetworking = enablePrivateNetworking
 // Construct identity resource ID from known values (required for deployment-time calculation)
 var userAssignedIdentityResourceIdForACI = '/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${userAssignedIdentityResourceName}'
 // Deploy ACI only when imageTag is set to a real tag (not 'none')
@@ -837,27 +612,22 @@ resource containerInstance 'Microsoft.ContainerInstance/containerGroups@2025-09-
             { name: 'AZURE_PACKAGE_LOGGING_LEVEL', value: 'WARNING' }
             { name: 'AZURE_LOGGING_PACKAGES', value: '' }
             // Application Insights
-            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: enableMonitoring ? applicationInsights!.outputs.connectionString : '' }
+            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: applicationInsights.outputs.connectionString }
           ]
         }
       }
     ]
     osType: 'Linux'
     restartPolicy: 'Always'
-    subnetIds: isPrivateNetworking ? [
-      {
-        id: virtualNetwork!.outputs.aciSubnetResourceId
-      }
-    ] : null
     ipAddress: {
-      type: isPrivateNetworking ? 'Private' : 'Public'
+      type: 'Public'
       ports: [
         {
           port: aciPort
           protocol: 'TCP'
         }
       ]
-      dnsNameLabel: isPrivateNetworking ? null : containerInstanceName
+      dnsNameLabel: containerInstanceName
     }
     // Managed identity auth for ACR (instead of anonymous pull)
     imageRegistryCredentials: [
@@ -940,7 +710,7 @@ output AZURE_ENV_OPENAI_API_VERSION string = azureOpenaiAPIVersion
 output AZURE_OPENAI_RESOURCE string = aiFoundryAiServicesResourceName
 
 @description('Contains Application Insights Connection String')
-output AZURE_APPLICATION_INSIGHTS_CONNECTION_STRING string = (enableMonitoring && !useExistingLogAnalytics) ? applicationInsights!.outputs.connectionString : ''
+output AZURE_APPLICATION_INSIGHTS_CONNECTION_STRING string = applicationInsights.outputs.connectionString
 
 @description('Contains the location used for AI Services deployment')
 output AZURE_ENV_AI_SERVICE_LOCATION string = azureAiServiceLocation
@@ -948,8 +718,8 @@ output AZURE_ENV_AI_SERVICE_LOCATION string = azureAiServiceLocation
 @description('Contains Container Instance Name')
 output CONTAINER_INSTANCE_NAME string = shouldDeployACI ? containerInstance!.name : ''
 
-@description('Contains Container Instance FQDN (only for non-private networking)')
-output CONTAINER_INSTANCE_FQDN string = (shouldDeployACI && !isPrivateNetworking) ? containerInstance!.properties.ipAddress.fqdn : ''
+@description('Contains Container Instance FQDN')
+output CONTAINER_INSTANCE_FQDN string = shouldDeployACI ? containerInstance!.properties.ipAddress.fqdn : ''
 
 @description('Contains ACR Name')
 output AZURE_ENV_CONTAINER_REGISTRY_NAME string = containerRegistry.outputs.name
