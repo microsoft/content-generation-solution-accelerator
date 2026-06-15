@@ -687,7 +687,9 @@ async def _handle_search_products(
     result = await orchestrator.select_products(
         request_text=message,
         current_products=current_products,
-        available_products=available_products
+        available_products=available_products,
+        user_id=user_id,
+        conversation_id=conversation_id
     )
 
     # Save assistant response

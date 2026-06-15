@@ -554,7 +554,11 @@ class _RequestTokenTracker:
         agent = agent_name or "unknown_agent"
         model = self._resolve_model(agent)
         prev_usage, prev_model = self.by_agent.get(agent, (TokenUsage(), model))
-        self.by_agent[agent] = (prev_usage + usage, prev_model or model)
+        if prev_model and model and prev_model != model:
+            resolved_model = "multiple"
+        else:
+            resolved_model = prev_model or model
+        self.by_agent[agent] = (prev_usage + usage, resolved_model)
         if model:
             self.by_model[model] = self.by_model.get(model, TokenUsage()) + usage
         self.total = self.total + usage
@@ -574,9 +578,10 @@ class _RequestTokenTracker:
     def record_event(self, event: Any) -> bool:
         """Extract usage from a workflow ``run_stream`` event and record it.
 
-        Reads ``event.executor_id`` for per-agent attribution and falls back
-        through ``extract_usage_from_stream_chunk`` then ``extract_usage`` to
-        cover both ``AgentRunUpdateEvent`` and ``AgentRunEvent`` data shapes.
+        Reads ``event.executor_id`` for per-agent attribution and uses
+        ``extract_usage_from_stream_chunk`` (which tries the top-level shape
+        then ``metadata.usage``) to cover both ``AgentRunUpdateEvent`` and
+        ``AgentRunEvent`` data shapes.
         """
         if event is None:
             return False
@@ -584,7 +589,7 @@ class _RequestTokenTracker:
         data = getattr(event, "data", None)
         if data is None or not executor_id:
             return False
-        usage = extract_usage_from_stream_chunk(data) or extract_usage(data)
+        usage = extract_usage_from_stream_chunk(data)
         if usage:
             self._add(executor_id, usage)
             return True
@@ -1442,7 +1447,9 @@ Analyze this creative brief request and determine if all critical information is
         self,
         request_text: str,
         current_products: list = None,
-        available_products: list = None
+        available_products: list = None,
+        user_id: str = "",
+        conversation_id: str = ""
     ) -> dict:
         """
         Select or modify product selection via natural language.
@@ -1493,7 +1500,9 @@ Important:
 """
 
         try:
-            token_acc = self._new_token_accumulator()
+            token_acc = self._new_token_accumulator(
+                conversation_id=conversation_id, user_id=user_id
+            )
             response = await research_agent.run(select_prompt)
             try:
                 token_acc.record_response(agent_name="research_agent", response=response)

@@ -118,7 +118,7 @@ class TitleService:
 
         try:
             deployment = (
-                app_settings.ai_foundry.model_deployment
+                (app_settings.ai_foundry.model_deployment or app_settings.azure_openai.gpt_model)
                 if app_settings.ai_foundry.use_foundry
                 else app_settings.azure_openai.gpt_model
             ) or ""
