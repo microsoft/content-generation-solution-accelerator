@@ -20,11 +20,11 @@ services:
       prepackage:
         windows:
           shell: pwsh
-          run: ../../../infra/scripts/package_frontend.ps1
+          run: ../../../infra/scripts/build/package_frontend.ps1
           continueOnError: false
         posix:
           shell: sh
-          run: chmod +x ../../../infra/scripts/package_frontend.sh && ../../../infra/scripts/package_frontend.sh
+          run: chmod +x ../../../infra/scripts/build/package_frontend.sh && ../../../infra/scripts/build/package_frontend.sh
           continueOnError: false
 
 hooks:
@@ -253,10 +253,10 @@ hooks:
         Write-Host "===== Running Post-Deploy Script =====" -ForegroundColor Yellow
         $python = "python"
         if (Test-Path "./.venv/Scripts/python.exe") { $python = "./.venv/Scripts/python.exe" }
-        & $python -m pip install -r ./scripts/requirements-post-deploy.txt --quiet 2>$null
+        & $python -m pip install -r ./infra/scripts/post-provision/requirements-post-deploy.txt --quiet 2>$null
         
-        if (Test-Path "./scripts/post_deploy.py") {
-          & $python ./scripts/post_deploy.py --skip-tests
+        if (Test-Path "./infra/scripts/post-provision/post_deploy.py") {
+          & $python ./infra/scripts/post-provision/post_deploy.py --skip-tests
           if ($LASTEXITCODE -eq 0) {
             Write-Host "Post-deploy script completed successfully!" -ForegroundColor Green
           } else {
@@ -277,10 +277,10 @@ hooks:
         echo "===== Running Post-Deploy Script ====="
         PYTHON="python3"
         if [ -f "./.venv/bin/python" ]; then PYTHON="./.venv/bin/python"; fi
-        $PYTHON -m pip install -r ./scripts/requirements-post-deploy.txt --quiet 2>/dev/null
+        $PYTHON -m pip install -r ./infra/scripts/post-provision/requirements-post-deploy.txt --quiet 2>/dev/null
         
-        if [ -f "./scripts/post_deploy.py" ]; then
-          $PYTHON ./scripts/post_deploy.py --skip-tests \
+        if [ -f "./infra/scripts/post-provision/post_deploy.py" ]; then
+          $PYTHON ./infra/scripts/post-provision/post_deploy.py --skip-tests \
             && echo "Post-deploy script completed successfully!" \
             || echo "Post-deploy script completed with warnings"
         fi

@@ -29,7 +29,7 @@ from datetime import datetime
 from pathlib import Path
 
 # Add the backend directory to the path
-backend_path = Path(__file__).parent.parent / "src" / "backend"
+backend_path = Path(__file__).parent.parent.parent.parent / "src" / "backend"
 sys.path.insert(0, str(backend_path))
 
 # Now import the image generation function

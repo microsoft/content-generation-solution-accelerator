@@ -35,7 +35,7 @@ try {
 
 # Get current directory
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectDir = Split-Path -Parent $ScriptDir
+$ProjectDir = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $ScriptDir))
 
 Set-Location $ProjectDir
 

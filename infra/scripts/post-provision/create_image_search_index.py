@@ -37,10 +37,10 @@ from azure.storage.blob.aio import BlobServiceClient
 from dotenv import load_dotenv
 
 # Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
 
 # Load environment variables
-env_path = Path(__file__).parent.parent / ".env"
+env_path = Path(__file__).parent.parent.parent.parent / ".env"
 load_dotenv(env_path)
 
 # Configuration

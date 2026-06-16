@@ -32,7 +32,7 @@ az account show &> /dev/null || {
 
 # Get current directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_DIR="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")"
 
 cd "$PROJECT_DIR"
 

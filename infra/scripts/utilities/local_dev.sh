@@ -31,7 +31,7 @@ NC='\033[0m' # No Color
 
 # Get the script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 SRC_DIR="$PROJECT_ROOT/src"
 BACKEND_DIR="$SRC_DIR/backend"
 FRONTEND_DIR="$SRC_DIR/App"
@@ -293,10 +293,10 @@ setup() {
     fi
     
     print_header "Setup Complete!"
-    echo -e "To start development, run: ${GREEN}./scripts/local_dev.sh${NC}"
+    echo -e "To start development, run: ${GREEN}./infra/scripts/utilities/local_dev.sh${NC}"
     echo -e "Or start individually:"
-    echo -e "  Backend:  ${GREEN}./scripts/local_dev.sh backend${NC}"
-    echo -e "  Frontend: ${GREEN}./scripts/local_dev.sh frontend${NC}"
+    echo -e "  Backend:  ${GREEN}./infra/scripts/utilities/local_dev.sh backend${NC}"
+    echo -e "  Frontend: ${GREEN}./infra/scripts/utilities/local_dev.sh frontend${NC}"
 }
 
 # =============================================================================
@@ -361,7 +361,7 @@ start_backend() {
     
     # Check for .env
     if [ ! -f ".env" ]; then
-        print_error ".env file not found. Run: ./scripts/local_dev.sh setup"
+        print_error ".env file not found. Run: ./infra/scripts/utilities/local_dev.sh setup"
         exit 1
     fi
     
@@ -376,7 +376,7 @@ start_backend() {
         source .venv/bin/activate
         print_success "Virtual environment activated"
     else
-        print_error "Virtual environment not found. Run: ./scripts/local_dev.sh setup"
+        print_error "Virtual environment not found. Run: ./infra/scripts/utilities/local_dev.sh setup"
         exit 1
     fi
     
@@ -416,7 +416,7 @@ start_frontend() {
     
     # Check if node_modules exists
     if [ ! -d "node_modules" ]; then
-        print_error "Node modules not found. Run: ./scripts/local_dev.sh setup"
+        print_error "Node modules not found. Run: ./infra/scripts/utilities/local_dev.sh setup"
         exit 1
     fi
     
@@ -448,7 +448,7 @@ start_all() {
             print_info "Created .env from .env.sample. Update the file with your Azure resource values."
         fi
         if [ ! -f ".env" ]; then
-            print_error "Failed to create .env. Run './scripts/local_dev.sh env' or create .env manually from .env.sample."
+            print_error "Failed to create .env. Run './infra/scripts/utilities/local_dev.sh env' or create .env manually from .env.sample."
             exit 1
         fi
     else

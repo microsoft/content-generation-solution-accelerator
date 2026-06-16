@@ -128,7 +128,7 @@ git clone <repository-url>
 cd content-generation-solution-accelerator
 
 # Run deployment script
-./scripts/deploy.sh
+./infra/scripts/build/deploy.sh
 ```
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed manual deployment instructions.

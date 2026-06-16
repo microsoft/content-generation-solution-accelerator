@@ -19,9 +19,11 @@ This application consists of **two separate services** that run in parallel:
 
 ```bash
 content-generation-solution-accelerator/    ← Repository root (start here)
-├── scripts/
-│   ├── local_dev.ps1               ← Local dev script (Windows)
-│   └── local_dev.sh                ← Local dev script (Linux/Mac)
+├── infra/
+│   └── scripts/
+│       └── utilities/
+│           ├── local_dev.ps1       ← Local dev script (Windows)
+│           └── local_dev.sh        ← Local dev script (Linux/Mac)
 ├── src/
 │   ├── backend/
 │   │   ├── app.py                  ← API entry point
@@ -183,13 +185,13 @@ Start everything with a single command:
 
 **Windows PowerShell:**
 ```powershell
-.\scripts\local_dev.ps1
+.\infra\scripts\utilities\local_dev.ps1
 ```
 
 **Linux/Mac:**
 ```bash
-chmod +x ./scripts/local_dev.sh   # First time only: grant execute permission
-./scripts/local_dev.sh
+chmod +x ./infra/scripts/utilities/local_dev.sh   # First time only: grant execute permission
+./infra/scripts/utilities/local_dev.sh
 ```
 
 The script automatically handles environment setup, dependency installation, Azure authentication, role assignments, and starts both the backend (port 5000) and frontend (port 3000).
@@ -200,13 +202,13 @@ The script automatically handles environment setup, dependency installation, Azu
 
 If you prefer more control over the setup process, follow the steps below to configure and run each service individually.
 
-> **Linux/Mac:** If you haven't already, run `chmod +x ./scripts/local_dev.sh` first to grant execute permission.
+> **Linux/Mac:** If you haven't already, run `chmod +x ./infra/scripts/utilities/local_dev.sh` first to grant execute permission.
 
 #### 1. Generate Environment Configuration
 
 ```powershell
-.\scripts\local_dev.ps1 -Command env        # Windows PowerShell
-./scripts/local_dev.sh env                  # Linux/Mac
+.\infra\scripts\utilities\local_dev.ps1 -Command env        # Windows PowerShell
+./infra/scripts/utilities/local_dev.sh env                  # Linux/Mac
 ```
 
 This runs `azd env get-values` and writes the output to a `.env` file in the repository root.
@@ -230,8 +232,8 @@ This runs `azd env get-values` and writes the output to a `.env` file in the rep
 #### 2. Install Dependencies
 
 ```powershell
-.\scripts\local_dev.ps1 -Command setup      # Windows PowerShell
-./scripts/local_dev.sh setup                # Linux/Mac
+.\infra\scripts\utilities\local_dev.ps1 -Command setup      # Windows PowerShell
+./infra/scripts/utilities/local_dev.sh setup                # Linux/Mac
 ```
 
 Creates a Python virtual environment (`.venv`), installs backend Python packages, and installs frontend Node.js packages.
@@ -239,15 +241,15 @@ Creates a Python virtual environment (`.venv`), installs backend Python packages
 #### 3. Start Backend
 
 ```powershell
-.\scripts\local_dev.ps1 -Command backend    # Windows PowerShell
-./scripts/local_dev.sh backend              # Linux/Mac
+.\infra\scripts\utilities\local_dev.ps1 -Command backend    # Windows PowerShell
+./infra/scripts/utilities/local_dev.sh backend              # Linux/Mac
 ```
 
 #### 4. Start Frontend (in a separate terminal)
 
 ```powershell
-.\scripts\local_dev.ps1 -Command frontend   # Windows PowerShell
-./scripts/local_dev.sh frontend             # Linux/Mac
+.\infra\scripts\utilities\local_dev.ps1 -Command frontend   # Windows PowerShell
+./infra/scripts/utilities/local_dev.sh frontend             # Linux/Mac
 ```
 
 ---
@@ -271,15 +273,15 @@ Both servers support **hot reload** - changes to source files trigger automatic 
 Removes Python caches, `node_modules`, and build artifacts:
 
 ```powershell
-.\scripts\local_dev.ps1 -Command clean      # Windows PowerShell
-./scripts/local_dev.sh clean                # Linux/Mac
+.\infra\scripts\utilities\local_dev.ps1 -Command clean      # Windows PowerShell
+./infra/scripts/utilities/local_dev.sh clean                # Linux/Mac
 ```
 
 ### Show Help
 
 ```powershell
-.\scripts\local_dev.ps1 -Command help       # Windows PowerShell
-./scripts/local_dev.sh help                 # Linux/Mac
+.\infra\scripts\utilities\local_dev.ps1 -Command help       # Windows PowerShell
+./infra/scripts/utilities/local_dev.sh help                 # Linux/Mac
 ```
 
 ---
@@ -361,8 +363,8 @@ kill -9 <PID>                        # Linux/macOS
 Stop-Process -Id <PID>              # Windows PowerShell
 
 # Or use a different port
-BACKEND_PORT=8000 ./scripts/local_dev.sh backend                           # Linux/Mac
-$env:BACKEND_PORT=8000; .\scripts\local_dev.ps1 -Command backend          # Windows PowerShell
+BACKEND_PORT=8000 ./infra/scripts/utilities/local_dev.sh backend                           # Linux/Mac
+$env:BACKEND_PORT=8000; .\infra\scripts\utilities\local_dev.ps1 -Command backend          # Windows PowerShell
 ```
 
 ### Virtual Environment Issues
@@ -375,15 +377,15 @@ rm -rf .venv                                          # Linux/macOS
 Remove-Item -Recurse -Force .venv                     # Windows PowerShell
 
 # Then re-run setup
-./scripts/local_dev.sh setup                          # Linux/Mac
-.\scripts\local_dev.ps1 -Command setup                # Windows PowerShell
+./infra/scripts/utilities/local_dev.sh setup                          # Linux/Mac
+.\infra\scripts\utilities\local_dev.ps1 -Command setup                # Windows PowerShell
 ```
 
 ### Node Modules Issues
 
 ```bash
-./scripts/local_dev.sh clean && ./scripts/local_dev.sh setup              # Linux/Mac
-.\scripts\local_dev.ps1 -Command clean; .\scripts\local_dev.ps1 -Command setup   # Windows PowerShell
+./infra/scripts/utilities/local_dev.sh clean && ./infra/scripts/utilities/local_dev.sh setup              # Linux/Mac
+.\infra\scripts\utilities\local_dev.ps1 -Command clean; .\infra\scripts\utilities\local_dev.ps1 -Command setup   # Windows PowerShell
 ```
 
 ### Azure Authentication

@@ -345,8 +345,8 @@ jobs:
           IMAGE_MODEL_MIN_CAPACITY: ${{ env.IMAGE_MODEL_MIN_CAPACITY }}
           AZURE_REGIONS: ${{ vars.AZURE_REGIONS }}
         run: |
-          chmod +x scripts/checkquota.sh
-          QUOTA_OUTPUT="$(scripts/checkquota.sh 2>&1)"; QUOTA_STATUS=$?
+          chmod +x infra/scripts/pre-provision/checkquota.sh
+          QUOTA_OUTPUT="$(infra/scripts/pre-provision/checkquota.sh 2>&1)"; QUOTA_STATUS=$?
           echo "$QUOTA_OUTPUT"
           if [ "$QUOTA_STATUS" -ne 0 ]; then
             # If quota check fails due to insufficient quota, set the flag
