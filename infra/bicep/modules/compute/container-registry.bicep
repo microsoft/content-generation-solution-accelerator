@@ -1,6 +1,7 @@
 // ============================================================================
-// Module: Azure Container Registry (AVM)
-// AVM Module: avm/res/container-registry/registry:0.12.1
+// Module: Azure Container Registry
+// Description: Creates an Azure Container Registry
+// API: Microsoft.ContainerRegistry/registries@2025-04-01
 // ============================================================================
 
 @description('Solution name used for naming convention.')
@@ -19,80 +20,45 @@ param tags object = {}
 @allowed(['Basic', 'Standard', 'Premium'])
 param sku string = 'Premium'
 
-@description('Enable admin user for the registry.')
+@description('Enable admin user.')
 param adminUserEnabled bool = false
 
 @description('Public network access setting.')
 @allowed(['Enabled', 'Disabled'])
 param publicNetworkAccess string = 'Enabled'
 
-@description('Export policy status. Must be "enabled" when publicNetworkAccess is "Enabled".')
+@description('Export policy status.')
 param exportPolicyStatus string = 'enabled'
 
-@description('Principal IDs to assign AcrPull role.')
-param acrPullPrincipalIds array = []
-
-@description('Enable private networking.')
-param enablePrivateNetworking bool = false
-
-@description('Subnet resource ID for private endpoint.')
-param privateEndpointSubnetId string = ''
-
-@description('Private DNS zone resource IDs for private endpoint.')
-param privateDnsZoneResourceIds array = []
-
-@description('Default action for the network rule set. Use Allow when no private endpoint is in place; Deny for private-only.')
-@allowed(['Allow', 'Deny'])
-param networkRuleSetDefaultAction string = 'Allow'
-
-@description('Enable Azure telemetry collection.')
-param enableTelemetry bool = true
-
 // ============================================================================
-// Role Assignments
+// Resource Deployment
 // ============================================================================
-var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
-
-var roleAssignments = [for principalId in acrPullPrincipalIds: {
-  principalId: principalId
-  roleDefinitionIdOrName: acrPullRoleId
-  principalType: 'ServicePrincipal'
-}]
-
-// ============================================================================
-// Private Endpoint Config
-// ============================================================================
-var dnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
-  name: 'config${i}'
-  privateDnsZoneResourceId: zoneId
-}]
-
-var privateEndpointConfig = enablePrivateNetworking && !empty(privateEndpointSubnetId) ? [
-  {
-    subnetResourceId: privateEndpointSubnetId
-    privateDnsZoneGroup: !empty(privateDnsZoneResourceIds) ? {
-      privateDnsZoneGroupConfigs: dnsZoneConfigs
-    } : null
+resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-04-01' = {
+  name: name
+  location: location
+  tags: tags
+  sku: {
+    name: sku
   }
-] : []
-
-// ============================================================================
-// Container Registry (AVM)
-// ============================================================================
-module containerRegistry 'br/public:avm/res/container-registry/registry:0.12.1' = {
-  name: take('avm.res.containerregistry.${name}', 64)
-  params: {
-    name: name
-    location: location
-    tags: tags
-    enableTelemetry: enableTelemetry
-    acrSku: sku
-    acrAdminUserEnabled: adminUserEnabled
+  properties: {
+    adminUserEnabled: adminUserEnabled
     publicNetworkAccess: publicNetworkAccess
-    exportPolicyStatus: exportPolicyStatus
-    roleAssignments: !empty(acrPullPrincipalIds) ? roleAssignments : []
-    privateEndpoints: privateEndpointConfig
-    networkRuleSetDefaultAction: networkRuleSetDefaultAction
+    dataEndpointEnabled: false
+    networkRuleBypassOptions: 'AzureServices'
+    policies: {
+      exportPolicy: {
+        status: exportPolicyStatus
+      }
+      retentionPolicy: {
+        status: 'enabled'
+        days: 7
+      }
+      trustPolicy: {
+        status: 'disabled'
+        type: 'Notary'
+      }
+    }
+    zoneRedundancy: 'Disabled'
   }
 }
 
@@ -100,10 +66,10 @@ module containerRegistry 'br/public:avm/res/container-registry/registry:0.12.1' 
 // Outputs
 // ============================================================================
 @description('The name of the container registry.')
-output name string = containerRegistry.outputs.name
+output name string = containerRegistry.name
 
 @description('The login server URL.')
-output loginServer string = containerRegistry.outputs.loginServer
+output loginServer string = containerRegistry.properties.loginServer
 
 @description('The resource ID of the container registry.')
-output resourceId string = containerRegistry.outputs.resourceId
+output resourceId string = containerRegistry.id

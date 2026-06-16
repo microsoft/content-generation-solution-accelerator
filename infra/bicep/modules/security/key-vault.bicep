@@ -1,6 +1,8 @@
 // ============================================================================
-// Module: Azure Key Vault (AVM)
-// AVM Module: avm/res/key-vault/vault:0.12.1
+// Module: Azure Key Vault
+// Description: Vanilla Bicep module for Azure Key Vault
+// Resource: Microsoft.KeyVault/vaults@2023-07-01
+// Docs: https://learn.microsoft.com/azure/templates/microsoft.keyvault/vaults
 // ============================================================================
 
 @description('Solution name used for naming convention.')
@@ -35,63 +37,33 @@ param enablePurgeProtection bool = true
 @allowed(['Enabled', 'Disabled'])
 param publicNetworkAccess string = 'Enabled'
 
-@description('Secrets to store in the vault (name/value pairs).')
-param secrets array = []
-
-@description('Enable Azure telemetry collection.')
-param enableTelemetry bool = true
-
-@description('Role assignments.')
-param roleAssignments array = []
-
-@description('Enable private networking.')
-param enablePrivateNetworking bool = false
-
-@description('Subnet resource ID for private endpoint.')
-param privateEndpointSubnetId string = ''
-
-@description('Private DNS zone resource IDs.')
-param privateDnsZoneResourceIds array = []
+@description('The Microsoft Entra tenant ID for the Key Vault.')
+param tenantId string = subscription().tenantId
 
 // ============================================================================
-// Key Vault (AVM)
+// Key Vault Resource
 // ============================================================================
 
-var secretItems = [for secret in secrets: {
-  name: secret.name
-  value: secret.value
-}]
-
-var dnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
-  name: 'config${i}'
-  privateDnsZoneResourceId: zoneId
-}]
-
-var privateEndpointConfig = enablePrivateNetworking && !empty(privateEndpointSubnetId) ? [
-  {
-    subnetResourceId: privateEndpointSubnetId
-    privateDnsZoneGroup: !empty(privateDnsZoneResourceIds) ? {
-      privateDnsZoneGroupConfigs: dnsZoneConfigs
-    } : null
-  }
-] : []
-
-module keyVault 'br/public:avm/res/key-vault/vault:0.12.1' = {
-  name: take('avm.res.keyvault.vault.${name}', 64)
-  params: {
-    name: name
-    location: location
-    tags: tags
-    enableTelemetry: enableTelemetry
-    sku: sku
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+  name: name
+  location: location
+  tags: tags
+  properties: {
+    tenantId: tenantId
+    sku: {
+      family: 'A'
+      name: sku
+    }
+    accessPolicies: []
     enableRbacAuthorization: enableRbacAuthorization
     enableSoftDelete: enableSoftDelete
     softDeleteRetentionInDays: softDeleteRetentionInDays
     enablePurgeProtection: enablePurgeProtection
     publicNetworkAccess: publicNetworkAccess
-    roleAssignments: !empty(roleAssignments) ? roleAssignments : []
-    secrets: !empty(secrets) ? secretItems : []
-    privateEndpoints: privateEndpointConfig
+    networkAcls: {
+      bypass: 'AzureServices'
+      defaultAction: publicNetworkAccess == 'Disabled' ? 'Deny' : 'Allow'
+    }
   }
 }
 
@@ -99,11 +71,11 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.12.1' = {
 // Outputs
 // ============================================================================
 
-@description('The name of the key vault.')
-output name string = keyVault.outputs.name
+@description('The name of the Key Vault.')
+output name string = keyVault.name
 
-@description('The URI of the key vault.')
-output uri string = keyVault.outputs.uri
+@description('The URI of the Key Vault.')
+output uri string = keyVault.properties.vaultUri
 
-@description('The resource ID of the key vault.')
-output resourceId string = keyVault.outputs.resourceId
+@description('The resource ID of the Key Vault.')
+output resourceId string = keyVault.id

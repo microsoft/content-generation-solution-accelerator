@@ -2,12 +2,12 @@
 // Module: AI Search
 // Description: Deploys Azure AI Search with a two-step pattern:
 //   Step 1: Plain Bicep resource for fast initial creation (name, location, SKU)
-//   Step 2: AVM module update to enable managed identity & full configuration
+//   Step 2: Separate module deployment to enable managed identity & full config
 // This reduces deployment time by making the resource available immediately
-// while identity enablement proceeds separately.
-// AVM Module: avm/res/search/search-service:0.12.0
-// WAF: https://learn.microsoft.com/azure/well-architected/service-guides/azure-cognitive-search
+// while identity enablement proceeds as a separate ARM deployment.
 // ============================================================================
+
+targetScope = 'resourceGroup'
 
 @description('Solution name suffix used to derive the resource name.')
 @minLength(3)
@@ -43,10 +43,10 @@ param semanticSearch string = 'free'
 @description('Whether to disable local authentication.')
 param disableLocalAuth bool = true
 
-@description('Optional. Authentication options for the search service (e.g., aadOrApiKey).')
+@description('Optional. Authentication options for the search service.')
 param authOptions object = {}
 
-@description('Optional. Network rule set for the search service (e.g., bypass: AzureServices).')
+@description('Optional. Network rule set for the search service.')
 param networkRuleSet object = {}
 
 @description('Managed identity type for the search service.')
@@ -55,26 +55,10 @@ param managedIdentityType string = 'SystemAssigned'
 @description('Public network access setting.')
 param publicNetworkAccess string = 'Enabled'
 
-// --- WAF: Telemetry ---
-@description('Optional. Enable/Disable usage telemetry for module.')
-param enableTelemetry bool = true
-
-// --- WAF: Monitoring ---
-@description('Diagnostic settings for monitoring.')
-param diagnosticSettings array = []
-
-// --- WAF: Private Networking ---
-@description('Private endpoint configurations.')
-param privateEndpoints array = []
-
-// --- Role Assignments ---
-@description('Optional. Array of role assignments to create on the AI Search service.')
-param roleAssignments array = []
-
 // ============================================================================
-// Step 1: Initial resource creation (plain Bicep — fast)
+// Step 1: Initial resource creation (fast — no identity)
 // ============================================================================
-resource searchService 'Microsoft.Search/searchServices@2025-05-01' = {
+resource aiSearch 'Microsoft.Search/searchServices@2025-05-01' = {
   name: name
   location: location
   sku: {
@@ -83,47 +67,39 @@ resource searchService 'Microsoft.Search/searchServices@2025-05-01' = {
 }
 
 // ============================================================================
-// Step 2: AVM update — enables identity & full configuration
+// Step 2: Separate deployment — enables identity & full configuration
 // ============================================================================
-module searchServiceUpdate 'br/public:avm/res/search/search-service:0.12.0' = {
-  name: take('avm.res.search.update.${name}', 64)
+module searchServiceUpdate 'ai-search-identity.bicep' = {
+  name: 'searchServiceUpdate'
   params: {
-    name: name
+    name: aiSearch.name
     location: location
     tags: tags
-    enableTelemetry: enableTelemetry
-    sku: skuName
+    skuName: skuName
     replicaCount: replicaCount
     partitionCount: partitionCount
     hostingMode: hostingMode
     semanticSearch: semanticSearch
-    authOptions: !empty(authOptions) ? authOptions : null
     disableLocalAuth: disableLocalAuth
-    networkRuleSet: !empty(networkRuleSet) ? networkRuleSet : null
+    authOptions: authOptions
+    networkRuleSet: networkRuleSet
+    managedIdentityType: managedIdentityType
     publicNetworkAccess: publicNetworkAccess
-    managedIdentities: {
-      systemAssigned: managedIdentityType == 'SystemAssigned'
-    }
-    diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
-    privateEndpoints: privateEndpoints
-    roleAssignments: !empty(roleAssignments) ? roleAssignments : []
   }
-  dependsOn: [
-    searchService
-  ]
 }
 
 // ============================================================================
 // Outputs
 // ============================================================================
+
 @description('Resource ID of the AI Search service.')
-output resourceId string = searchService.id
+output resourceId string = aiSearch.id
 
 @description('Name of the AI Search service.')
-output name string = searchService.name
+output name string = aiSearch.name
 
 @description('Endpoint URL of the AI Search service.')
-output endpoint string = 'https://${searchService.name}.search.windows.net'
+output endpoint string = 'https://${aiSearch.name}.search.windows.net'
 
 @description('System-assigned identity principal ID.')
-output identityPrincipalId string = searchServiceUpdate.outputs.?systemAssignedMIPrincipalId ?? ''
+output identityPrincipalId string = searchServiceUpdate.outputs.systemAssignedMIPrincipalId

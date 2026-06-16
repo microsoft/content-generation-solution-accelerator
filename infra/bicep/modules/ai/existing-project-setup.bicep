@@ -1,5 +1,5 @@
 // ============================================================================
-// Module: Existing AI Foundry Project Reference
+// Module: Existing AI Foundry Project Reference — Vanilla Bicep
 // Description: References an existing AI Services account and project to
 //              retrieve their identities. No deployments, no connections.
 //              Use generic ai-foundry-connection and ai-foundry-model-deployment
@@ -15,6 +15,7 @@ param projectName string
 // ============================================================================
 // Existing Resource References
 // ============================================================================
+
 resource aiServices 'Microsoft.CognitiveServices/accounts@2025-12-01' existing = {
   name: name
 }
@@ -44,7 +45,7 @@ output cognitiveServicesEndpoint string = aiServices.properties.endpoint
 output azureOpenAiCuEndpoint string = aiServices.properties.endpoints['Content Understanding']
 
 @description('System-assigned identity principal ID of the AI Services account (empty if none).')
-output principalId string = aiServices.identity.?principalId ?? ''
+output principalId string = contains(aiServices, 'identity') && contains(aiServices.identity, 'principalId') ? aiServices.identity.principalId : ''
 
 @description('Resource ID of the AI Foundry project.')
 output projectResourceId string = aiProject.id
@@ -56,5 +57,4 @@ output projectName string = aiProject.name
 output projectEndpoint string = aiProject.properties.endpoints['AI Foundry API']
 
 @description('System-assigned identity principal ID of the project (empty if none).')
-output projectIdentityPrincipalId string = aiProject.identity.?principalId ?? ''
-
+output projectIdentityPrincipalId string = contains(aiProject, 'identity') && contains(aiProject.identity, 'principalId') ? aiProject.identity.principalId : ''

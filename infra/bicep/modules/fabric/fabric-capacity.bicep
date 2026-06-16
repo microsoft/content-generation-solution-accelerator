@@ -1,7 +1,7 @@
 // ============================================================================
 // Module: Fabric Capacity
-// Description: AVM wrapper for Microsoft Fabric Capacity
-// AVM Module: avm/res/fabric/capacity:0.1.2
+// Description: Vanilla Bicep module for Microsoft Fabric Capacity
+// Resource: Microsoft.Fabric/capacities@2023-11-01
 // Docs: https://learn.microsoft.com/azure/templates/microsoft.fabric/capacities
 // ============================================================================
 
@@ -36,22 +36,22 @@ param skuName string = 'F2'
 @description('List of admin members (UPNs for users, object IDs for service principals).')
 param adminMembers array
 
-@description('Optional. Enable/Disable usage telemetry for module.')
-param enableTelemetry bool = true
-
 // ============================================================================
-// AVM Module Reference
+// Resource
 // ============================================================================
 
-module fabricCapacity 'br/public:avm/res/fabric/capacity:0.1.2' = {
-  name: take('avm.res.fabric.capacity.${name}', 64)
-  params: {
-    name: name
-    location: location
-    skuName: skuName
-    adminMembers: adminMembers
-    tags: tags
-    enableTelemetry: enableTelemetry
+resource fabricCapacity 'Microsoft.Fabric/capacities@2023-11-01' = {
+  name: name
+  location: location
+  tags: tags
+  sku: {
+    name: skuName
+    tier: 'Fabric'
+  }
+  properties: {
+    administration: {
+      members: adminMembers
+    }
   }
 }
 
@@ -60,13 +60,13 @@ module fabricCapacity 'br/public:avm/res/fabric/capacity:0.1.2' = {
 // ============================================================================
 
 @description('The name of the deployed Fabric capacity.')
-output name string = fabricCapacity.outputs.name
+output name string = fabricCapacity.name
 
 @description('The resource ID of the deployed Fabric capacity.')
-output resourceId string = fabricCapacity.outputs.resourceId
+output resourceId string = fabricCapacity.id
 
 @description('The resource group name.')
-output resourceGroupName string = fabricCapacity.outputs.resourceGroupName
+output resourceGroupName string = resourceGroup().name
 
 @description('The location of the deployed Fabric capacity.')
-output location string = fabricCapacity.outputs.location
+output location string = fabricCapacity.location

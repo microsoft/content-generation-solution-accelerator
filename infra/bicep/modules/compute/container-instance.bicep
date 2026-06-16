@@ -1,6 +1,7 @@
 // ============================================================================
-// Module: Azure Container Instance (AVM)
-// AVM Module: avm/res/container-instance/container-group:0.7.0
+// Module: Azure Container Instance
+// Description: Creates an Azure Container Instance group
+// API: Microsoft.ContainerInstance/containerGroups@2025-09-01
 // ============================================================================
 
 @description('Name of the container group.')
@@ -47,50 +48,51 @@ param subnetResourceId string = ''
 @description('Availability zone for the container group. Use -1 for no zone.')
 param availabilityZone int = -1
 
-@description('Enable Azure telemetry collection.')
-param enableTelemetry bool = true
-
 // ============================================================================
 // Variables
 // ============================================================================
 var isPrivateNetworking = !empty(subnetResourceId)
 
-var containers = [
-  {
-    name: name
-    properties: {
-      image: containerImage
-      resources: {
-        requests: {
-          cpu: cpu
-          memoryInGB: string(memoryInGB)
-        }
-      }
-      ports: [
-        {
-          port: port
-          protocol: 'TCP'
-        }
-      ]
-      environmentVariables: environmentVariables
-    }
-  }
-]
+var identityConfig = empty(managedIdentities) ? { type: 'None' } : {
+  type: contains(managedIdentities, 'userAssignedResourceIds') ? 'UserAssigned' : 'SystemAssigned'
+  userAssignedIdentities: contains(managedIdentities, 'userAssignedResourceIds') ? reduce(managedIdentities.userAssignedResourceIds, {}, (cur, id) => union(cur, { '${id}': {} })) : null
+}
 
 // ============================================================================
-// Container Instance (AVM)
+// Resource Deployment
 // ============================================================================
-module containerGroup 'br/public:avm/res/container-instance/container-group:0.7.0' = {
-  name: take('avm.res.containerinstance.${name}', 64)
-  params: {
-    name: name
-    location: location
-    tags: tags
-    enableTelemetry: enableTelemetry
-    containers: containers
+resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2025-09-01' = {
+  name: name
+  location: location
+  tags: tags
+  identity: identityConfig
+  zones: availabilityZone != -1 ? [string(availabilityZone)] : null
+  properties: {
     osType: osType
     restartPolicy: restartPolicy
-    managedIdentities: !empty(managedIdentities) ? managedIdentities : {}
+    containers: [
+      {
+        name: name
+        properties: {
+          image: containerImage
+          resources: {
+            requests: {
+              cpu: cpu
+              memoryInGB: memoryInGB
+            }
+          }
+          ports: [
+            {
+              port: port
+              protocol: 'TCP'
+            }
+          ]
+          environmentVariables: environmentVariables
+        }
+      }
+    ]
+    imageRegistryCredentials: imageRegistryCredentials
+    subnetIds: isPrivateNetworking ? [{ id: subnetResourceId }] : null
     ipAddress: {
       type: isPrivateNetworking ? 'Private' : 'Public'
       ports: [
@@ -101,9 +103,6 @@ module containerGroup 'br/public:avm/res/container-instance/container-group:0.7.
       ]
       dnsNameLabel: isPrivateNetworking ? null : name
     }
-    imageRegistryCredentials: !empty(imageRegistryCredentials) ? imageRegistryCredentials : []
-    subnets: isPrivateNetworking ? [{ subnetResourceId: subnetResourceId }] : []
-    availabilityZone: availabilityZone
   }
 }
 
@@ -111,10 +110,10 @@ module containerGroup 'br/public:avm/res/container-instance/container-group:0.7.
 // Outputs
 // ============================================================================
 @description('The name of the container group.')
-output name string = containerGroup.outputs.name
+output name string = containerGroup.name
 
 @description('The resource ID of the container group.')
-output resourceId string = containerGroup.outputs.resourceId
+output resourceId string = containerGroup.id
 
 @description('The IP address of the container group.')
-output ipAddress string = containerGroup.outputs.?iPv4Address ?? ''
+output ipAddress string = containerGroup.properties.ipAddress.ip
