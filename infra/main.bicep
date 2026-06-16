@@ -56,7 +56,7 @@ param secondaryLocation string = 'uksouth'
   azd: {
     type: 'location'
     usageName: [
-      'OpenAI.GlobalStandard.gpt-5.1,150'
+      'OpenAI.GlobalStandard.gpt-5.1,50'
       'OpenAI.GlobalStandard.gpt-image-1-mini,1'
     ]
   }
@@ -92,7 +92,7 @@ param azureOpenaiAPIVersion string = '2025-01-01-preview'
 
 @minValue(10)
 @description('Optional. AI model deployment token capacity.')
-param gptModelCapacity int = 150
+param gptModelCapacity int = 50
 
 @minValue(1)
 @description('Optional. Image model deployment capacity (RPM).')
