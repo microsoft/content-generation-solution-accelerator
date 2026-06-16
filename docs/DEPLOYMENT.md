@@ -139,7 +139,7 @@ When you start the deployment, most parameters will have **default values**, but
 | **GPT Model**                               | Choose from **gpt-4, gpt-4o, gpt-4o-mini, gpt-5.1**.                                                               | gpt-5.1           |
 | **GPT Model Version**                       | The version of the selected GPT model.                                                                    | 2025-11-13            |
 | **OpenAI API Version**                      | The Azure OpenAI API version to use.                                                                      | 2025-01-01-preview     |
-| **GPT Model Deployment Capacity**           | Configure capacity for **GPT models** (in thousands).                                                     | 150k                    |
+| **GPT Model Deployment Capacity**           | Configure capacity for **GPT models** (in thousands).                                                     | 50k                    |
 | **Image Model**                            | Choose from **gpt-image-1-mini, gpt-image-1.5**                                                                               | gpt-image-1-mini                  |
 | **Image Tag**                               | Docker image tag to deploy. Common values: `latest`, `dev`, `hotfix`.                                     | latest                 |
 | **Existing Log Analytics Workspace**        | To reuse an existing Log Analytics Workspace ID.                                                          | *(empty)*              |
@@ -150,7 +150,7 @@ When you start the deployment, most parameters will have **default values**, but
 <details>
   <summary><b>[Optional] Quota Recommendations</b></summary>
 
-By default, the **GPT-5.1 model capacity** in deployment is set to **150k tokens**, so we recommend updating the following:
+By default, the **GPT-5.1 model capacity** in deployment is set to **50k tokens**, so we recommend updating the following:
 
 > **For GPT-5.1 - increase the capacity post-deployment for optimal performance if required.**
 

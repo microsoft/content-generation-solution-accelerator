@@ -100,7 +100,7 @@ on:
         value: ${{ jobs.azure-setup.outputs.QUOTA_FAILED || 'false' }}
 
 env:
-  GPT_MIN_CAPACITY: 150
+  GPT_MIN_CAPACITY: 50
   IMAGE_MODEL_MIN_CAPACITY: 1
   BRANCH_NAME: ${{ github.event.workflow_run.head_branch || github.head_ref || github.ref_name }}
   WAF_ENABLED: ${{ inputs.trigger_type == 'workflow_dispatch' && (inputs.waf_enabled || false) || false }}
