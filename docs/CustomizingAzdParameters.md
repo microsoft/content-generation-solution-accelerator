@@ -14,7 +14,7 @@ By default this template will use the environment name as the prefix to prevent 
 | `AZURE_ENV_GPT_MODEL_NAME`              | string  | `gpt-5.1`                 | Specifies the GPT model name to deploy.                                       |
 | `AZURE_ENV_GPT_MODEL_VERSION`                    | string  | `2025-11-13`               | Sets the GPT model version.                                                   |
 | `AZURE_ENV_MODEL_DEPLOYMENT_TYPE`            | string  | `GlobalStandard`           | Defines the model deployment type (allowed: `Standard`, `GlobalStandard`).    |
-| `AZURE_ENV_GPT_MODEL_CAPACITY`                   | integer | `150`                      | Sets the GPT model token capacity (minimum: `10`).                            |
+| `AZURE_ENV_GPT_MODEL_CAPACITY`                   | integer | `50`                      | Sets the GPT model token capacity (minimum: `10`).                            |
 | `AZURE_ENV_IMAGE_MODEL_NAME`           | string  | `gpt-image-1-mini`         | Image model to deploy (allowed: `gpt-image-1-mini`, `gpt-image-1.5`, `none`). |
 | `AZURE_ENV_IMAGE_MODEL_CAPACITY`       | integer | `1`                        | Sets the image model deployment capacity in RPM (minimum: `1`).               |
 | `AZURE_ENV_OPENAI_API_VERSION`            | string  | `2025-01-01-preview`       | Specifies the API version for Azure OpenAI service.                           |

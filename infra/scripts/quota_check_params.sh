@@ -37,8 +37,8 @@ log_verbose() {
 }
 
 # Default Models and Capacities for Content Generation
-# GPT-5.1: 150 tokens, GPT-Image-1-mini: 1 RPM (Requests Per Minute)
-DEFAULT_MODEL_CAPACITY="gpt-5.1:150,gpt-image-1-mini:1"
+# GPT-5.1: 50 tokens, GPT-Image-1-mini: 1 RPM (Requests Per Minute)
+DEFAULT_MODEL_CAPACITY="gpt-5.1:50,gpt-image-1-mini:1"
 
 # Convert the comma-separated string into an array
 IFS=',' read -r -a MODEL_CAPACITY_PAIRS <<< "$DEFAULT_MODEL_CAPACITY"
