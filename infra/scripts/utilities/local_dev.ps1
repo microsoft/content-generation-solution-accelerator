@@ -28,7 +28,7 @@ $ErrorActionPreference = "Stop"
 
 # Get the script directory
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectRoot = Split-Path -Parent $ScriptDir
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $ScriptDir))
 $SrcDir = Join-Path $ProjectRoot "src"
 $BackendDir = Join-Path $SrcDir "backend"
 $FrontendDir = Join-Path $SrcDir "App"
@@ -304,12 +304,12 @@ function Invoke-Setup {
     
     Write-Header "Setup Complete!"
     Write-Host "To start development, run: " -NoNewline
-    Write-Host ".\scripts\local_dev.ps1" -ForegroundColor Green
+    Write-Host ".\infra\scripts\utilities\local_dev.ps1" -ForegroundColor Green
     Write-Host "Or start individually:"
     Write-Host "  Backend:  " -NoNewline
-    Write-Host ".\scripts\local_dev.ps1 -Command backend" -ForegroundColor Green
+    Write-Host ".\infra\scripts\utilities\local_dev.ps1 -Command backend" -ForegroundColor Green
     Write-Host "  Frontend: " -NoNewline
-    Write-Host ".\scripts\local_dev.ps1 -Command frontend" -ForegroundColor Green
+    Write-Host ".\infra\scripts\utilities\local_dev.ps1 -Command frontend" -ForegroundColor Green
 }
 
 # =============================================================================
@@ -378,7 +378,7 @@ function Start-Backend {
     
     # Check for .env
     if (-not (Test-Path ".env")) {
-        Write-Error ".env file not found. Run: .\scripts\local_dev.ps1 -Command setup"
+        Write-Error ".env file not found. Run: .\infra\scripts\utilities\local_dev.ps1 -Command setup"
         exit 1
     }
     
@@ -394,7 +394,7 @@ function Start-Backend {
         & $activateScript
         Write-Success "Virtual environment activated"
     } else {
-        Write-Error "Virtual environment not found. Run: .\scripts\local_dev.ps1 -Command setup"
+        Write-Error "Virtual environment not found. Run: .\infra\scripts\utilities\local_dev.ps1 -Command setup"
         exit 1
     }
     
@@ -459,7 +459,7 @@ function Start-Frontend {
     try {
         # Check if node_modules exists
         if (-not (Test-Path "node_modules")) {
-            Write-Error "Node modules not found. Run: .\scripts\local_dev.ps1 -Command setup"
+            Write-Error "Node modules not found. Run: .\infra\scripts\utilities\local_dev.ps1 -Command setup"
             exit 1
         }
         
@@ -494,7 +494,7 @@ function Start-All {
             Write-Info "Created .env from .env.sample. Update the file with your Azure resource values."
         }
         if (-not (Test-Path ".env")) {
-            Write-Error "Failed to create .env. Run '.\scripts\local_dev.ps1 -Command env' or create .env manually from .env.sample."
+            Write-Error "Failed to create .env. Run '.\infra\scripts\utilities\local_dev.ps1 -Command env' or create .env manually from .env.sample."
             exit 1
         }
     } else {

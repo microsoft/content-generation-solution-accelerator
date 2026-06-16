@@ -82,10 +82,10 @@ hooks:
         elseif (Test-Path "../.venv/Scripts/python.exe") { $python = "../.venv/Scripts/python.exe" }
         elseif (Test-Path "./.venv/bin/python") { $python = "./.venv/bin/python" }
         elseif (Test-Path "../.venv/bin/python") { $python = "../.venv/bin/python" }
-        & $python -m pip install -r ./scripts/requirements-post-deploy.txt --quiet | Out-Null
+        & $python -m pip install -r ./infra/scripts/post-provision/requirements-post-deploy.txt --quiet | Out-Null
         
-        if (Test-Path "./scripts/post_deploy.py") {
-          & $python ./scripts/post_deploy.py --skip-tests
+        if (Test-Path "./infra/scripts/post-provision/post_deploy.py") {
+          & $python ./infra/scripts/post-provision/post_deploy.py --skip-tests
           
           if ($LASTEXITCODE -eq 0) {
             Write-Host "Post-deploy script completed successfully!" -ForegroundColor Green
@@ -124,7 +124,7 @@ hooks:
         echo "===== Running Post-Deploy Script ====="
         echo "This will upload sample data and create the search index..."
         
-        if [ -f "./scripts/post_deploy.py" ]; then
+        if [ -f "./infra/scripts/post-provision/post_deploy.py" ]; then
           # Prefer local venv if present (repo root or content-gen)
           if [ -x "./.venv/bin/python" ]; then
             PYTHON_BIN="./.venv/bin/python"
@@ -134,8 +134,8 @@ hooks:
             PYTHON_BIN="python3"
           fi
 
-          "$PYTHON_BIN" -m pip install -r ./scripts/requirements-post-deploy.txt --quiet > /dev/null \
-            && "$PYTHON_BIN" ./scripts/post_deploy.py --skip-tests \
+          "$PYTHON_BIN" -m pip install -r ./infra/scripts/post-provision/requirements-post-deploy.txt --quiet > /dev/null \
+            && "$PYTHON_BIN" ./infra/scripts/post-provision/post_deploy.py --skip-tests \
             && echo "Post-deploy script completed successfully!" \
             || echo "Post-deploy script completed with warnings (some steps may have failed)"
         else

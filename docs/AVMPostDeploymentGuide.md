@@ -109,14 +109,14 @@ Navigate to the repository root directory and create a Python virtual environmen
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r ./scripts/requirements-post-deploy.txt
+pip install -r ./infra/scripts/post-provision/requirements-post-deploy.txt
 ```
 
 **For Linux/Mac (bash):**
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r ./scripts/requirements-post-deploy.txt
+pip install -r ./infra/scripts/post-provision/requirements-post-deploy.txt
 ```
 
 #### 2.3 Execute the Post-Deployment Script
@@ -125,17 +125,17 @@ Run the post-deployment script with your resource group name. The script will au
 
 **For Windows (PowerShell):**
 ```powershell
-python ./scripts/post_deploy.py -g <your-resource-group-name> --skip-tests
+python ./infra/scripts/post-provision/post_deploy.py -g <your-resource-group-name> --skip-tests
 ```
 
 **For Linux/Mac (bash):**
 ```bash
-python3 ./scripts/post_deploy.py -g <your-resource-group-name> --skip-tests
+python3 ./infra/scripts/post-provision/post_deploy.py -g <your-resource-group-name> --skip-tests
 ```
 
 **Example:**
 ```powershell
-python ./scripts/post_deploy.py -g rg-contentgen-prod --skip-tests
+python ./infra/scripts/post-provision/post_deploy.py -g rg-contentgen-prod --skip-tests
 ```
 
 > ⚠️ **Important**: The script uses Azure CLI authentication and will automatically discover resource names from deployment outputs. Ensure you're logged in with `az login` before running.
@@ -153,7 +153,7 @@ $env:APP_SERVICE_NAME = "app-contentgen-abc123"
 $env:AZURE_BLOB_ACCOUNT_NAME = "stcontentgenabc123"
 $env:COSMOSDB_ACCOUNT_NAME = "cosmos-contentgen-abc123"
 $env:AI_SEARCH_SERVICE_NAME = "search-contentgen-abc123"
-python ./scripts/post_deploy.py --skip-tests
+python ./infra/scripts/post-provision/post_deploy.py --skip-tests
 ```
 
 The script will:

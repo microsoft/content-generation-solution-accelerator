@@ -8,7 +8,7 @@ This script tests the end-to-end content generation flow:
 4. Image Content Agent generates image prompts
 5. Compliance Agent validates content
 
-Run with: python scripts/test_content_generation.py
+Run with: python infra/scripts/utilities/test_content_generation.py
 """
 
 import asyncio
@@ -17,10 +17,10 @@ import os
 from typing import Dict, Any
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
 
 from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '..', '.env'))
 
 
 # Sample creative briefs for testing
