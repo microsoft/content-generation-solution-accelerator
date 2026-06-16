@@ -1,35 +1,66 @@
-@description('Required. Name of the AI Services account.')
-param aiServicesName string
+// ============================================================================
+// Module: Model Deployment — Vanilla Bicep
+// Description: Deploys a single AI model to an existing AI Services account.
+//              Called repetitively from main.bicep for each model in the array.
+//              Generic, reusable across GSAs.
+// ============================================================================
 
-@description('Required. Array of model deployments to create.')
-param deployments array = []
+targetScope = 'resourceGroup'
 
-// Reference AI Services account (module is scoped to the correct resource group)
-resource aiServices 'Microsoft.CognitiveServices/accounts@2025-12-01' existing = {
-  name: aiServicesName
+@description('Required. Name of the parent AI Services account.')
+param aiServicesAccountName string
+
+@description('Required. Name for this model deployment.')
+param deploymentName string
+
+@description('Optional. Model format (e.g., OpenAI).')
+param modelFormat string = 'OpenAI'
+
+@description('Required. Model name (e.g., gpt-4o, text-embedding-ada-002).')
+param modelName string
+
+@description('Optional. Model version. Empty string means latest.')
+param modelVersion string = ''
+
+@description('Optional. RAI policy name.')
+param raiPolicyName string = 'Microsoft.Default'
+
+@description('Required. SKU name (e.g., Standard, GlobalStandard).')
+param skuName string
+
+@description('Required. SKU capacity (tokens per minute in thousands).')
+param skuCapacity int
+
+// ============================================================================
+// Model Deployment
+// ============================================================================
+resource aiServicesAccount 'Microsoft.CognitiveServices/accounts@2025-12-01' existing = {
+  name: aiServicesAccountName
 }
 
-// Deploy models to AI Services account
-// Using batchSize(1) to avoid concurrent deployment issues
-@batchSize(1)
-resource modelDeployments 'Microsoft.CognitiveServices/accounts/deployments@2025-12-01' = [
-  for (deployment, index) in deployments: {
-    parent: aiServices
-    name: deployment.name
-    properties: {
-      model: {
-        format: deployment.format
-        name: deployment.model
-        version: deployment.version
-      }
-      raiPolicyName: deployment.raiPolicyName
+resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-12-01' = {
+  parent: aiServicesAccount
+  name: deploymentName
+  properties: {
+    model: {
+      format: modelFormat
+      name: modelName
+      version: !empty(modelVersion) ? modelVersion : null
     }
-    sku: {
-      name: deployment.sku.name
-      capacity: deployment.sku.capacity
-    }
+    raiPolicyName: raiPolicyName
   }
-]
+  sku: {
+    name: skuName
+    capacity: skuCapacity
+  }
+}
 
-@description('The names of the deployed models.')
-output deployedModelNames array = [for (deployment, i) in deployments: modelDeployments[i].name]
+// ============================================================================
+// Outputs
+// ============================================================================
+
+@description('Name of the deployed model.')
+output name string = modelDeployment.name
+
+@description('Resource ID of the model deployment.')
+output resourceId string = modelDeployment.id

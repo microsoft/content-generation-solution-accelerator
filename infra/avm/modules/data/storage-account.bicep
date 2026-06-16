@@ -1,95 +1,139 @@
 // ============================================================================
 // Module: Storage Account
-// Description: AVM wrapper for an Azure Storage Account (blob) used for
-//              product and generated image storage.
+// Description: AVM wrapper for Azure Storage Account with WAF alignment
 // AVM Module: avm/res/storage/storage-account:0.32.0
+// WAF: https://learn.microsoft.com/azure/well-architected/service-guides/storage-accounts
 // ============================================================================
 
-@description('Required. Name of the storage account.')
-param name string
+@description('Solution name suffix used to derive the resource name.')
+param solutionName string
 
-@description('Required. Azure region for the resource.')
+@description('Name of the storage account.')
+param name string = take('st${toLower(replace(solutionName, '-', ''))}', 24)
+
+@description('Azure region for the resource.')
 param location string
 
-@description('Optional. Tags to apply to the resource.')
+@description('Tags to apply to the resource.')
 param tags object = {}
+
+@description('Storage account SKU.')
+param skuName string = 'Standard_LRS'
+
+@description('Storage account kind.')
+param kind string = 'StorageV2'
+
+@description('Access tier.')
+@allowed(['Hot', 'Cool'])
+param accessTier string = 'Hot'
+
+@description('Allow blob public access.')
+param allowBlobPublicAccess bool = false
+
+@description('Allow shared key access.')
+param allowSharedKeyAccess bool = true
+
+@description('Enable hierarchical namespace (Data Lake Storage Gen2).')
+param enableHierarchicalNamespace bool = false
 
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
 
-@description('Optional. Storage account SKU.')
-param skuName string = 'Standard_LRS'
+@description('Blob containers to create.')
+param containers array = [
+  {
+    name: 'default'
+    publicAccess: 'None'
+  }
+]
 
-@description('Required. Blob containers to create.')
-param containers array
-
-@description('Required. Principal ID of the managed identity to grant Storage Blob Data Contributor.')
-param principalId string
-
-@description('Optional. Enable private networking (disables public access, adds private endpoint).')
-param enablePrivateNetworking bool = false
-
-@description('Optional. Subnet resource ID for the private endpoint.')
-param subnetResourceId string = ''
-
-@description('Optional. Resource ID of the blob private DNS zone.')
-param blobDnsZoneResourceId string = ''
-
-@description('Optional. Diagnostic settings for monitoring.')
+// --- WAF: Monitoring ---
+@description('Diagnostic settings for monitoring.')
 param diagnosticSettings array = []
 
-module storageAccount 'br/public:avm/res/storage/storage-account:0.32.0' = {
+// --- WAF: Private Networking ---
+@description('Public network access setting.')
+param publicNetworkAccess string = 'Enabled'
+
+@description('Network ACLs for the storage account.')
+param networkAcls object = {
+  defaultAction: 'Allow'
+  bypass: 'AzureServices'
+}
+
+@description('Whether to enable private networking.')
+param enablePrivateNetworking bool = false
+
+@description('Subnet resource ID for the private endpoint.')
+param privateEndpointSubnetId string = ''
+
+@description('Private DNS zone resource IDs for Storage (blob).')
+param privateDnsZoneResourceIds array = []
+
+var privateDnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
+  name: 'dns-zone-${i}'
+  privateDnsZoneResourceId: zoneId
+}]
+
+// --- Role Assignments ---
+@description('Optional. Array of role assignments to create on the Storage Account.')
+param roleAssignments array = []
+
+// ============================================================================
+// AVM Module Deployment
+// ============================================================================
+module storage 'br/public:avm/res/storage/storage-account:0.32.0' = {
   name: take('avm.res.storage.storage-account.${name}', 64)
   params: {
     name: name
     location: location
-    skuName: skuName
-    managedIdentities: { systemAssigned: true }
-    minimumTlsVersion: 'TLS1_2'
-    requireInfrastructureEncryption: true
-    enableTelemetry: enableTelemetry
     tags: tags
-    accessTier: 'Hot'
+    enableTelemetry: enableTelemetry
+    skuName: skuName
+    kind: kind
+    accessTier: accessTier
+    allowBlobPublicAccess: allowBlobPublicAccess
+    allowSharedKeyAccess: allowSharedKeyAccess
+    enableHierarchicalNamespace: enableHierarchicalNamespace
+    minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
+    requireInfrastructureEncryption: true
+    publicNetworkAccess: publicNetworkAccess
+    networkAcls: networkAcls
     blobServices: {
-      containerDeleteRetentionPolicyEnabled: true
-      containerDeleteRetentionPolicyDays: 7
-      deleteRetentionPolicyEnabled: true
-      deleteRetentionPolicyDays: 7
-      containers: containers
+      containers: [for container in containers: {
+        name: container.name
+        publicAccess: container.publicAccess
+      }]
+      diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
     }
-    roleAssignments: [
+    diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
+    privateEndpoints: enablePrivateNetworking ? [
       {
-        principalId: principalId
-        roleDefinitionIdOrName: 'Storage Blob Data Contributor'
-        principalType: 'ServicePrincipal'
+        name: 'pep-${name}'
+        customNetworkInterfaceName: 'nic-${name}'
+        subnetResourceId: privateEndpointSubnetId
+        service: 'blob'
+        privateDnsZoneGroup: {
+          privateDnsZoneGroupConfigs: privateDnsZoneConfigs
+        }
       }
-    ]
-    networkAcls: {
-      bypass: 'AzureServices'
-      defaultAction: enablePrivateNetworking ? 'Deny' : 'Allow'
-    }
-    allowBlobPublicAccess: false
-    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
-    privateEndpoints: enablePrivateNetworking
-      ? [
-          {
-            service: 'blob'
-            subnetResourceId: subnetResourceId
-            privateDnsZoneGroup: {
-              privateDnsZoneGroupConfigs: [
-                { privateDnsZoneResourceId: blobDnsZoneResourceId }
-              ]
-            }
-          }
-        ]
-      : null
-    diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : null
+    ] : []
+    roleAssignments: !empty(roleAssignments) ? roleAssignments : []
   }
 }
 
-@description('Resource ID of the storage account.')
-output resourceId string = storageAccount.outputs.resourceId
+// ============================================================================
+// Outputs
+// ============================================================================
+@description('Resource ID of the Storage Account.')
+output resourceId string = storage.outputs.resourceId
 
-@description('Name of the storage account.')
-output name string = storageAccount.outputs.name
+@description('Name of the Storage Account.')
+output name string = storage.outputs.name
+
+@description('Primary blob endpoint.')
+output blobEndpoint string = storage.outputs.primaryBlobEndpoint
+
+@description('Service endpoints.')
+output serviceEndpoints object = storage.outputs.serviceEndpoints

@@ -1,71 +1,75 @@
-// ========== container-instance.bicep ========== //
-// Azure Container Instance module for backend API deployment.
-// NOTE: Not used by the lean main.bicep (which inlines the ACI resource); retained
-//       for module parity with the AVM flavor across GSA.
+// ============================================================================
+// Module: Azure Container Instance
+// Description: Creates an Azure Container Instance group
+// API: Microsoft.ContainerInstance/containerGroups@2025-09-01
+// ============================================================================
 
-@description('Required. Name of the container group.')
+@description('Name of the container group.')
 param name string
 
-@description('Required. Location for the container instance.')
+@description('Azure region for deployment.')
 param location string
 
-@description('Optional. Tags for all resources.')
+@description('Resource tags.')
 param tags object = {}
 
-@description('Required. Container image to deploy.')
+@description('Container image to deploy.')
 param containerImage string
 
-@description('Optional. CPU cores for the container.')
+@description('CPU cores for the container.')
 param cpu int = 2
 
-@description('Optional. Memory in GB for the container.')
+@description('Memory in GB for the container.')
 param memoryInGB int = 4
 
-@description('Optional. Port to expose.')
+@description('Port to expose.')
 param port int = 8000
 
-@description('Optional. Subnet resource ID for VNet integration. If empty, public IP will be used.')
+@description('Environment variables for the container.')
+param environmentVariables array = []
+
+@description('Operating system type.')
+@allowed(['Linux', 'Windows'])
+param osType string = 'Linux'
+
+@description('Restart policy.')
+@allowed(['Always', 'OnFailure', 'Never'])
+param restartPolicy string = 'Always'
+
+@description('Managed identity configuration.')
+param managedIdentities object = {}
+
+@description('Image registry credentials.')
+param imageRegistryCredentials array = []
+
+@description('Subnet resource ID for VNet integration. If empty, public IP is used.')
 param subnetResourceId string = ''
 
-@description('Required. Environment variables for the container.')
-param environmentVariables array
+@description('Availability zone for the container group. Use -1 for no zone.')
+param availabilityZone int = -1
 
-@description('Optional. Enable/Disable usage telemetry for module.')
-param enableTelemetry bool = true
-
-@description('Required. User-assigned managed identity resource ID for ACR pull.')
-param userAssignedIdentityResourceId string
-
+// ============================================================================
+// Variables
+// ============================================================================
 var isPrivateNetworking = !empty(subnetResourceId)
 
-// ============== //
-// Resources      //
-// ============== //
-
-#disable-next-line no-deployments-resources
-resource avmTelemetry 'Microsoft.Resources/deployments@2025-04-01' = if (enableTelemetry) {
-  name: '46d3xbcp.res.containerinstance.${replace('-..--..-', '.', '-')}.${substring(uniqueString(deployment().name, location), 0, 4)}'
-  properties: {
-    mode: 'Incremental'
-    template: {
-      '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
-      contentVersion: '1.0.0.0'
-      resources: []
-    }
-  }
+var identityConfig = empty(managedIdentities) ? { type: 'None' } : {
+  type: contains(managedIdentities, 'userAssignedResourceIds') ? 'UserAssigned' : 'SystemAssigned'
+  userAssignedIdentities: contains(managedIdentities, 'userAssignedResourceIds') ? reduce(managedIdentities.userAssignedResourceIds, {}, (cur, id) => union(cur, { '${id}': {} })) : null
 }
 
+// ============================================================================
+// Resource Deployment
+// ============================================================================
 resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2025-09-01' = {
   name: name
   location: location
   tags: tags
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${userAssignedIdentityResourceId}': {}
-    }
-  }
+  identity: identityConfig
+  zones: availabilityZone != -1 ? [string(availabilityZone)] : null
   properties: {
+    osType: osType
+    restartPolicy: restartPolicy
     containers: [
       {
         name: name
@@ -87,13 +91,8 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2025-09-01'
         }
       }
     ]
-    osType: 'Linux'
-    restartPolicy: 'Always'
-    subnetIds: isPrivateNetworking ? [
-      {
-        id: subnetResourceId
-      }
-    ] : null
+    imageRegistryCredentials: imageRegistryCredentials
+    subnetIds: isPrivateNetworking ? [{ id: subnetResourceId }] : null
     ipAddress: {
       type: isPrivateNetworking ? 'Private' : 'Public'
       ports: [
@@ -104,27 +103,17 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2025-09-01'
       ]
       dnsNameLabel: isPrivateNetworking ? null : name
     }
-    imageRegistryCredentials: [
-      {
-        server: split(containerImage, '/')[0]
-        identity: userAssignedIdentityResourceId
-      }
-    ]
   }
 }
 
-// ============== //
-// Outputs        //
-// ============== //
-
+// ============================================================================
+// Outputs
+// ============================================================================
 @description('The name of the container group.')
 output name string = containerGroup.name
 
 @description('The resource ID of the container group.')
 output resourceId string = containerGroup.id
 
-@description('The IP address of the container (private or public depending on mode).')
+@description('The IP address of the container group.')
 output ipAddress string = containerGroup.properties.ipAddress.ip
-
-@description('The FQDN of the container (only available for public mode).')
-output fqdn string = isPrivateNetworking ? '' : containerGroup.properties.ipAddress.fqdn

@@ -1,58 +1,117 @@
-@description('Required. Name of the AI Services project.')
-param name string
+// ============================================================================
+// Module: AI Foundry Project (Account + Project) — Vanilla Bicep
+// Description: Creates an Azure AI Services account and AI Foundry project.
+//              Generic, reusable across GSAs — no app-specific parameters.
+// ============================================================================
 
-@description('Required. The location of the Project resource.')
-param location string = resourceGroup().location
+targetScope = 'resourceGroup'
 
-@description('Optional. The description of the AI Foundry project to create. Defaults to the project name.')
-param desc string = name
+@description('Required. Solution name suffix used to generate resource names.')
+param solutionName string
 
-@description('Required. Name of the existing Cognitive Services resource to create the AI Foundry project in.')
-param aiServicesName string
+@description('Optional. Override name for the AI Services account. Defaults to aif-{solutionName}.')
+param name string = 'aif-${solutionName}'
 
-@description('Required. Azure Existing AI Project ResourceID.')
-param azureExistingAIProjectResourceId string = ''
+@description('Optional. Override name for the AI Foundry project. Defaults to proj-{solutionName}.')
+param projectName string = 'proj-${solutionName}'
 
-@description('Optional. Tags to be applied to the resources.')
+@description('Required. Azure region for the resources.')
+param location string
+
+@description('Optional. Tags to apply to resources.')
 param tags object = {}
 
-var useExistingAiFoundryAiProject = !empty(azureExistingAIProjectResourceId)
-var existingOpenAIEndpoint = useExistingAiFoundryAiProject
-  ? format('https://{0}.openai.azure.com/', split(azureExistingAIProjectResourceId, '/')[8])
-  : ''
+@description('Optional. SKU name for the AI Services account.')
+param skuName string = 'S0'
 
-// Reference to cognitive service in current resource group for new projects
-resource cogServiceReference 'Microsoft.CognitiveServices/accounts@2025-12-01' existing = {
-  name: aiServicesName
-}
+@description('Optional. Whether to disable local (key-based) authentication.')
+param disableLocalAuth bool = true
 
-resource aiProject 'Microsoft.CognitiveServices/accounts/projects@2025-12-01' = {
-  parent: cogServiceReference
+@description('Optional. Whether to allow project management (AI Foundry hub).')
+param allowProjectManagement bool = true
+
+@description('Optional. Public network access setting.')
+param publicNetworkAccess string = 'Enabled'
+
+@description('Optional. Managed identity type for the resources.')
+@allowed(['SystemAssigned', 'UserAssigned', 'SystemAssigned, UserAssigned', 'None'])
+param identityType string = 'SystemAssigned'
+
+@description('Optional. Network ACLs default action.')
+@allowed(['Allow', 'Deny'])
+param networkAclsDefaultAction string = 'Allow'
+
+// ============================================================================
+// AI Services Account
+// ============================================================================
+resource aiServices 'Microsoft.CognitiveServices/accounts@2025-12-01' = {
   name: name
-  tags: tags
   location: location
+  tags: tags
+  sku: {
+    name: skuName
+  }
+  kind: 'AIServices'
   identity: {
-    type: 'SystemAssigned'
+    type: identityType
   }
   properties: {
-    description: desc
-    displayName: name
+    allowProjectManagement: allowProjectManagement
+    customSubDomainName: name
+    networkAcls: {
+      defaultAction: networkAclsDefaultAction
+      virtualNetworkRules: []
+      ipRules: []
+    }
+    publicNetworkAccess: publicNetworkAccess
+    disableLocalAuth: disableLocalAuth
   }
 }
 
-@description('Required. Name of the AI project.')
-output name string = aiProject.name
+// ============================================================================
+// AI Foundry Project
+// ============================================================================
+resource aiProject 'Microsoft.CognitiveServices/accounts/projects@2025-12-01' = {
+  parent: aiServices
+  name: projectName
+  location: location
+  kind: 'AIServices'
+  identity: {
+    type: identityType
+  }
+  properties: {}
+}
 
-@description('Required. Resource ID of the AI project.')
-output resourceId string = aiProject.id
+// ============================================================================
+// Outputs
+// ============================================================================
 
-@description('Required. API endpoint for the AI project.')
-output apiEndpoint string = aiProject!.properties.endpoints['AI Foundry API']
+@description('Resource ID of the AI Services account.')
+output resourceId string = aiServices.id
 
-@description('Contains AI Endpoint.')
-output aoaiEndpoint string = !empty(existingOpenAIEndpoint)
-  ? existingOpenAIEndpoint
-  : cogServiceReference.properties.endpoints['OpenAI Language Model Instance API']
+@description('Name of the AI Services account.')
+output name string = aiServices.name
 
-@description('Required. Principal ID of the AI project system-assigned managed identity.')
-output systemAssignedMIPrincipalId string = aiProject.identity.principalId
+@description('Endpoint of the AI Services account (OpenAI Language Model Instance API).')
+output endpoint string = aiServices.properties.endpoints['OpenAI Language Model Instance API']
+
+@description('Endpoint of the AI Services account (Cognitive Services).')
+output cognitiveServicesEndpoint string = aiServices.properties.endpoint
+
+@description('Azure OpenAI Content Understanding endpoint URL.')
+output azureOpenAiCuEndpoint string = aiServices.properties.endpoints['Content Understanding']
+
+@description('System-assigned identity principal ID of the AI Services account.')
+output principalId string = aiServices.identity.principalId
+
+@description('Resource ID of the AI Foundry project.')
+output projectResourceId string = aiProject.id
+
+@description('Name of the AI Foundry project.')
+output projectName string = aiProject.name
+
+@description('AI Foundry project endpoint.')
+output projectEndpoint string = aiProject.properties.endpoints['AI Foundry API']
+
+@description('System-assigned identity principal ID of the project.')
+output projectIdentityPrincipalId string = aiProject.identity.principalId

@@ -1,44 +1,60 @@
 // ============================================================================
 // Module: App Service Plan
-// Description: Vanilla Bicep module for an Azure App Service Plan (Linux).
-// Resource: Microsoft.Web/serverfarms@2024-04-01
+// Description: Creates an Azure App Service Plan
+// API: Microsoft.Web/serverfarms@2025-05-01
 // ============================================================================
 
-@description('Required. Name of the App Service Plan.')
-param name string
+@description('Solution name suffix used to derive the resource name.')
+param solutionName string
 
-@description('Required. Azure region for the resource.')
+@description('Name of the App Service Plan.')
+param name string = 'asp-${solutionName}'
+
+@description('Azure region for the resource.')
 param location string
 
-@description('Optional. Tags to apply to the resource.')
+@description('Tags to apply to the resource.')
 param tags object = {}
 
-@description('Optional. Enable/Disable usage telemetry for module.')
-#disable-next-line no-unused-params
-param enableTelemetry bool = true
+@description('SKU name for the App Service Plan.')
+@allowed(['F1', 'D1', 'B1', 'B2', 'B3', 'S1', 'S2', 'S3', 'P1', 'P2', 'P3', 'P4', 'P0v3', 'P0v4', 'P1v3', 'P1v4', 'P2v3', 'P3v3'])
+param skuName string = 'B2'
 
-@description('Optional. SKU name of the App Service Plan.')
-param skuName string = 'B1'
+@description('Whether the plan is Linux-based.')
+param reserved bool = true
 
-@description('Optional. Number of instances.')
+@description('Kind of the App Service Plan.')
+param kind string = 'linux'
+
+@description('Number of instances (workers).')
 param skuCapacity int = 1
 
-resource serverFarm 'Microsoft.Web/serverfarms@2024-04-01' = {
+@description('Enable zone redundancy. Requires Premium SKU (P1v3+).')
+param zoneRedundant bool = false
+
+// ============================================================================
+// Resource Deployment
+// ============================================================================
+resource appServicePlan 'Microsoft.Web/serverfarms@2025-05-01' = {
   name: name
   location: location
   tags: tags
-  kind: 'linux'
+  kind: kind
   sku: {
     name: skuName
     capacity: skuCapacity
   }
   properties: {
-    reserved: true
+    reserved: reserved
+    zoneRedundant: zoneRedundant
   }
 }
 
+// ============================================================================
+// Outputs
+// ============================================================================
 @description('Resource ID of the App Service Plan.')
-output resourceId string = serverFarm.id
+output resourceId string = appServicePlan.id
 
 @description('Name of the App Service Plan.')
-output name string = serverFarm.name
+output name string = appServicePlan.name

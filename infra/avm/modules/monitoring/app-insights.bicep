@@ -1,44 +1,76 @@
 // ============================================================================
 // Module: Application Insights
-// Description: AVM wrapper for Azure Application Insights component.
+// Description: AVM wrapper for Application Insights with WAF alignment
 // AVM Module: avm/res/insights/component:0.7.1
+// WAF: https://learn.microsoft.com/azure/well-architected/service-guides/application-insights
 // ============================================================================
 
-@description('Required. Name of the Application Insights component.')
-param name string
+@description('Solution name suffix used to derive the resource name.')
+param solutionName string
 
-@description('Required. Azure region for the resource.')
+@description('Optional. Override name for the Application Insights instance. Defaults to appi-{solutionName}.')
+param name string = 'appi-${solutionName}'
+
+@description('Azure region for the resource.')
 param location string
 
-@description('Optional. Tags to apply to the resource.')
+@description('Tags to apply to the resource.')
 param tags object = {}
+
+@description('Resource ID of the Log Analytics workspace to link to.')
+param workspaceResourceId string
+
+@description('Application type.')
+param applicationType string = 'web'
+
+@description('Retention period in days. WAF recommends 365.')
+param retentionInDays int = 365
+
+@description('Disable IP masking for security. WAF recommends false.')
+param disableIpMasking bool = false
+
+@description('Flow type for Application Insights.')
+param flowType string = 'Bluefield'
 
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
 
-@description('Required. Resource ID of the Log Analytics workspace to link.')
-param workspaceResourceId string
+@description('Kind of Application Insights resource.')
+param kind string = 'web'
 
-module component 'br/public:avm/res/insights/component:0.7.1' = {
+// ============================================================================
+// AVM Module Deployment
+// ============================================================================
+module appInsights 'br/public:avm/res/insights/component:0.7.1' = {
   name: take('avm.res.insights.component.${name}', 64)
   params: {
     name: name
-    tags: tags
     location: location
-    enableTelemetry: enableTelemetry
-    retentionInDays: 365
-    kind: 'web'
-    disableIpMasking: false
-    flowType: 'Bluefield'
+    tags: tags
     workspaceResourceId: workspaceResourceId
+    kind: kind
+    applicationType: applicationType
+    enableTelemetry: enableTelemetry
+    retentionInDays: retentionInDays
+    disableIpMasking: disableIpMasking
+    flowType: flowType
   }
 }
 
-@description('Resource ID of the Application Insights component.')
-output resourceId string = component.outputs.resourceId
+// ============================================================================
+// Outputs
+// ============================================================================
+@description('Resource ID of the Application Insights instance.')
+output resourceId string = appInsights.outputs.resourceId
 
-@description('Name of the Application Insights component.')
-output name string = component.outputs.name
+@description('Name of the Application Insights instance.')
+output name string = appInsights.outputs.name
 
-@description('Connection string of the Application Insights component.')
-output connectionString string = component.outputs.connectionString
+@description('Instrumentation key for the Application Insights instance.')
+output instrumentationKey string = appInsights.outputs.instrumentationKey
+
+@description('Connection string for the Application Insights instance.')
+output connectionString string = appInsights.outputs.connectionString
+
+@description('Application ID of the Application Insights instance.')
+output applicationId string = appInsights.outputs.applicationId
