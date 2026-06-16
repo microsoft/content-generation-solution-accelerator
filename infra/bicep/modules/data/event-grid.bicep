@@ -1,7 +1,7 @@
 // ============================================================================
 // Module: Azure Event Grid System Topic
-// Description: Deploys Azure Event Grid System Topic
-// API: Microsoft.EventGrid/systemTopics@2025-07-15-preview
+// Description: AVM wrapper for Azure Event Grid System Topic
+// AVM Module: avm/res/event-grid/system-topic:0.6.5
 // ============================================================================
 
 @description('Solution name suffix used to derive the resource name.')
@@ -16,6 +16,9 @@ param location string
 @description('Tags to apply to the resource.')
 param tags object = {}
 
+@description('Optional. Enable/Disable usage telemetry for module.')
+param enableTelemetry bool = true
+
 @description('Resource ID of the source that publishes events (e.g., Storage Account resource ID).')
 param source string
 
@@ -25,57 +28,38 @@ param topicType string
 @description('Event subscriptions to create on the system topic.')
 param eventSubscriptions array = []
 
-@description('Managed identities configuration. E.g., { systemAssigned: false, userAssignedResourceIds: [] }.')
+@description('Diagnostic settings for monitoring.')
+param diagnosticSettings array = []
+
+@description('Managed identities configuration.')
 param managedIdentities object = {}
 
 // ============================================================================
-// Resource
+// AVM Module Deployment
 // ============================================================================
-resource eventGridSystemTopic 'Microsoft.EventGrid/systemTopics@2025-07-15-preview' = {
-  name: name
-  location: location
-  tags: tags
-  identity: !empty(managedIdentities) ? {
-    type: (managedIdentities.?systemAssigned ?? false) && !empty(managedIdentities.?userAssignedResourceIds ?? [])
-      ? 'SystemAssigned,UserAssigned'
-      : (managedIdentities.?systemAssigned ?? false) ? 'SystemAssigned' : 'UserAssigned'
-    userAssignedIdentities: !empty(managedIdentities.?userAssignedResourceIds ?? [])
-      ? reduce(managedIdentities.userAssignedResourceIds, {}, (cur, next) => union(cur, { '${next}': {} }))
-      : null
-  } : null
-  properties: {
+module eventGridSystemTopic 'br/public:avm/res/event-grid/system-topic:0.6.5' = {
+  name: take('avm.res.event-grid.system-topic.${name}', 64)
+  params: {
+    name: name
+    location: location
+    tags: tags
+    enableTelemetry: enableTelemetry
     source: source
     topicType: topicType
+    eventSubscriptions: eventSubscriptions
+    diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
+    managedIdentities: !empty(managedIdentities) ? managedIdentities : null
   }
 }
-
-// ============================================================================
-// Event Subscriptions
-// ============================================================================
-resource systemTopicSubscriptions 'Microsoft.EventGrid/systemTopics/eventSubscriptions@2025-07-15-preview' = [
-  for sub in eventSubscriptions: {
-    name: sub.name
-    parent: eventGridSystemTopic
-    properties: {
-      destination: sub.destination
-      filter: sub.?filter ?? {}
-      eventDeliverySchema: sub.?eventDeliverySchema ?? 'EventGridSchema'
-      retryPolicy: sub.?retryPolicy ?? {
-        maxDeliveryAttempts: 30
-        eventTimeToLiveInMinutes: 1440
-      }
-    }
-  }
-]
 
 // ============================================================================
 // Outputs
 // ============================================================================
 @description('Name of the Event Grid System Topic.')
-output name string = eventGridSystemTopic.name
+output name string = eventGridSystemTopic.outputs.name
 
 @description('Resource ID of the Event Grid System Topic.')
-output resourceId string = eventGridSystemTopic.id
+output resourceId string = eventGridSystemTopic.outputs.resourceId
 
 @description('System-assigned principal ID (if enabled).')
-output systemAssignedMIPrincipalId string = (managedIdentities.?systemAssigned ?? false) ? eventGridSystemTopic.identity.principalId : ''
+output systemAssignedMIPrincipalId string = eventGridSystemTopic.outputs.?systemAssignedMIPrincipalId ?? ''

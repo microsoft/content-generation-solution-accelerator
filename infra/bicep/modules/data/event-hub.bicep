@@ -1,7 +1,5 @@
 // ============================================================================
-// Module: Azure Event Hub Namespace
-// Description: Creates an Azure Event Hub Namespace with event hubs
-// API: Microsoft.EventHub/namespaces@2024-01-01
+// Module: Azure Event Hub Namespace (AVM)
 // ============================================================================
 
 @description('Solution name used for naming convention.')
@@ -10,53 +8,85 @@ param solutionName string
 @description('Name of the Event Hub namespace.')
 param name string = 'evhns-${solutionName}'
 
-@description('Azure region for the resource.')
+@description('Azure region for deployment.')
 param location string
 
-@description('Tags to apply to the resource.')
+@description('Resource tags.')
 param tags object = {}
 
-@description('The SKU tier for the Event Hub namespace.')
-param sku string = 'Standard'
+@description('Enable Azure telemetry collection.')
+param enableTelemetry bool = true
 
-@description('The throughput unit or processing unit capacity.')
-param capacity int = 1
+@description('SKU configuration for the namespace.')
+param sku object = {
+  name: 'Standard'
+  capacity: 1
+}
 
 @description('Event hubs to create within the namespace.')
 param eventhubs array = []
 
+@description('Managed identity configuration.')
+param managedIdentities object = {}
+
+@description('Role assignments.')
+param roleAssignments array = []
+
+@description('Enable private networking.')
+param enablePrivateNetworking bool = false
+
+@description('Subnet resource ID for private endpoint.')
+param privateEndpointSubnetId string = ''
+
+@description('Private DNS zone resource IDs.')
+param privateDnsZoneResourceIds array = []
+
 // ============================================================================
-// Resource Deployment
+// Event Hub Namespace (AVM)
 // ============================================================================
-resource eventHubNamespace 'Microsoft.EventHub/namespaces@2024-01-01' = {
-  name: name
-  location: location
-  tags: tags
-  sku: {
-    name: sku
-    tier: sku
-    capacity: capacity
+
+var eventHubItems = [for eh in eventhubs: {
+  name: eh.name
+  messageRetentionInDays: contains(eh, 'messageRetentionInDays') ? eh.messageRetentionInDays : 1
+  partitionCount: contains(eh, 'partitionCount') ? eh.partitionCount : 2
+}]
+
+var dnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
+  name: 'config${i}'
+  privateDnsZoneResourceId: zoneId
+}]
+
+var privateEndpointConfig = enablePrivateNetworking && !empty(privateEndpointSubnetId) ? [
+  {
+    subnetResourceId: privateEndpointSubnetId
+    privateDnsZoneGroup: !empty(privateDnsZoneResourceIds) ? {
+      privateDnsZoneGroupConfigs: dnsZoneConfigs
+    } : null
   }
-  properties: {
-    minimumTlsVersion: '1.2'
-    publicNetworkAccess: 'Enabled'
+] : []
+
+module eventHubNamespace 'br/public:avm/res/event-hub/namespace:0.14.1' = {
+  name: take('avm.res.eventhub.namespace.${name}', 64)
+  params: {
+    name: name
+    location: location
+    tags: tags
+    enableTelemetry: enableTelemetry
+    skuName: sku.name
+    skuCapacity: sku.capacity
+    eventhubs: eventHubItems
+    managedIdentities: !empty(managedIdentities) ? managedIdentities : {}
+    roleAssignments: !empty(roleAssignments) ? roleAssignments : []
+    privateEndpoints: privateEndpointConfig
   }
 }
-
-resource eventHubResources 'Microsoft.EventHub/namespaces/eventhubs@2024-01-01' = [for eventhub in eventhubs: {
-  name: eventhub.name
-  parent: eventHubNamespace
-  properties: {
-    messageRetentionInDays: eventhub.?messageRetentionInDays ?? 1
-    partitionCount: eventhub.?partitionCount ?? 2
-  }
-}]
 
 // ============================================================================
 // Outputs
 // ============================================================================
+
 @description('The name of the Event Hub namespace.')
-output name string = eventHubNamespace.name
+output name string = eventHubNamespace.outputs.name
 
 @description('The resource ID of the Event Hub namespace.')
-output resourceId string = eventHubNamespace.id
+output resourceId string = eventHubNamespace.outputs.resourceId

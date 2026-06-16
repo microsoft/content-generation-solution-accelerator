@@ -1,8 +1,7 @@
 // ============================================================================
 // Module: Portal Dashboard (Application Insights)
-// Description: Vanilla Bicep module for Azure Portal Dashboard
-// Resource: Microsoft.Portal/dashboards@2025-04-01-preview
-// Docs: https://learn.microsoft.com/azure/templates/microsoft.portal/dashboards
+// Description: AVM wrapper for Azure Portal Dashboard
+// AVM Module: avm/res/portal/dashboard:0.3.2
 // ============================================================================
 
 @description('Solution name suffix used to derive the resource name.')
@@ -23,16 +22,21 @@ param lenses array = []
 @description('Dashboard metadata (time range, filters, etc.).')
 param metadata object = {}
 
+@description('Optional. Enable/Disable usage telemetry for module.')
+param enableTelemetry bool = true
+
 // ============================================================================
-// Resource
+// AVM Module Deployment
 // ============================================================================
-resource dashboard 'Microsoft.Portal/dashboards@2025-04-01-preview' = {
-  name: name
-  location: location
-  tags: tags
-  properties: {
+module dashboard 'br/public:avm/res/portal/dashboard:0.3.2' = {
+  name: take('avm.res.portal.dashboard.${name}', 64)
+  params: {
+    name: name
+    location: location
+    tags: tags
+    enableTelemetry: enableTelemetry
     lenses: lenses
-    metadata: !empty(metadata) ? metadata : {}
+    metadata: !empty(metadata) ? metadata : null
   }
 }
 
@@ -40,10 +44,10 @@ resource dashboard 'Microsoft.Portal/dashboards@2025-04-01-preview' = {
 // Outputs
 // ============================================================================
 @description('Resource ID of the dashboard.')
-output resourceId string = dashboard.id
+output resourceId string = dashboard.outputs.resourceId
 
 @description('Name of the dashboard.')
-output name string = dashboard.name
+output name string = dashboard.outputs.name
 
 @description('Resource group the dashboard was deployed to.')
-output resourceGroupName string = resourceGroup().name
+output resourceGroupName string = dashboard.outputs.resourceGroupName

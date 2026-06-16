@@ -1,7 +1,7 @@
 // ============================================================================
 // Module: Azure Kubernetes Service (AKS)
-// Description: Deploys Azure Kubernetes Service Managed Cluster
-// API: Microsoft.ContainerService/managedClusters@2025-03-01
+// Description: AVM wrapper for Azure Kubernetes Service Managed Cluster
+// AVM Module: avm/res/container-service/managed-cluster:0.13.1
 // ============================================================================
 
 @description('Solution name suffix used to derive the resource name.')
@@ -22,14 +22,17 @@ param kubernetesVersion string = '1.34'
 @description('Agent pool configurations. Each entry requires name, vmSize, count, mode (System/User).')
 param agentPools array = [
   {
-    name: 'systempool'
+    name: 'agentpool'
     vmSize: 'Standard_D4ds_v5'
     count: 2
     minCount: 1
-    maxCount: 3
+    maxCount: 2
     enableAutoScaling: true
     osType: 'Linux'
     mode: 'System'
+    type: 'VirtualMachineScaleSets'
+    scaleSetEvictionPolicy: 'Delete'
+    scaleSetPriority: 'Regular'
   }
 ]
 
@@ -67,57 +70,78 @@ param autoUpgradeChannel string = 'stable'
 @description('Log Analytics workspace resource ID for monitoring.')
 param logAnalyticsWorkspaceResourceId string = ''
 
+// --- WAF: Networking ---
+@description('Public network access setting.')
+@allowed(['Enabled', 'Disabled'])
+param publicNetworkAccess string = 'Enabled'
+
+@description('Enable private cluster (API server not publicly accessible).')
+param enablePrivateCluster bool = false
+
+@description('Subnet resource ID for the agent pool (for VNet integration).')
+param agentPoolSubnetId string = ''
+
+@description('Enable Microsoft Defender for Containers.')
+param enableDefender bool = false
+
+@description('Diagnostic settings for monitoring.')
+param diagnosticSettings array = []
+
+@description('Role assignments for the cluster.')
+param roleAssignments array = []
+
+@description('Enable Azure telemetry collection.')
+param enableTelemetry bool = true
+
 // ============================================================================
 // Variables
 // ============================================================================
 var effectiveDnsPrefix = !empty(dnsPrefix) ? dnsPrefix : name
+var enableMonitoring = !empty(logAnalyticsWorkspaceResourceId)
+
+var effectiveAgentPools = [for pool in agentPools: union(pool, !empty(agentPoolSubnetId) ? { vnetSubnetResourceId: agentPoolSubnetId } : {})]
 
 // ============================================================================
-// Resource Deployment
+// AVM Module Deployment
 // ============================================================================
-resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-03-01' = {
-  name: name
-  location: location
-  tags: tags
-  identity: {
-    type: 'SystemAssigned'
-  }
-  sku: {
-    name: 'Base'
-    tier: skuTier
-  }
-  properties: {
+module aksCluster 'br/public:avm/res/container-service/managed-cluster:0.13.1' = {
+  name: take('avm.res.container-service.managed-cluster.${name}', 64)
+  params: {
+    name: name
+    location: location
+    tags: tags
+    enableTelemetry: enableTelemetry
     kubernetesVersion: kubernetesVersion
-    dnsPrefix: effectiveDnsPrefix
+    primaryAgentPoolProfiles: effectiveAgentPools
     enableRBAC: enableRBAC
     disableLocalAccounts: disableLocalAccounts
-    agentPoolProfiles: [for pool in agentPools: {
-      name: pool.name
-      vmSize: pool.vmSize
-      count: pool.count
-      minCount: pool.?enableAutoScaling == true ? pool.?minCount : null
-      maxCount: pool.?enableAutoScaling == true ? pool.?maxCount : null
-      enableAutoScaling: pool.?enableAutoScaling ?? false
-      osType: pool.?osType ?? 'Linux'
-      mode: pool.mode
-    }]
-    networkProfile: {
-      networkPlugin: networkPlugin
-      networkPolicy: !empty(networkPolicy) ? networkPolicy : null
-      serviceCidr: serviceCidr
-      dnsServiceIP: dnsServiceIP
+    networkPlugin: networkPlugin
+    networkPolicy: networkPolicy
+    dnsPrefix: effectiveDnsPrefix
+    skuTier: skuTier
+    serviceCidr: serviceCidr
+    dnsServiceIP: dnsServiceIP
+    publicNetworkAccess: publicNetworkAccess
+    apiServerAccessProfile: {
+      enablePrivateCluster: enablePrivateCluster
     }
     autoUpgradeProfile: {
       upgradeChannel: autoUpgradeChannel
+      nodeOSUpgradeChannel: 'Unmanaged'
     }
-    addonProfiles: !empty(logAnalyticsWorkspaceResourceId) ? {
-      omsagent: {
-        enabled: true
-        config: {
-          logAnalyticsWorkspaceResourceID: logAnalyticsWorkspaceResourceId
+    managedIdentities: { systemAssigned: true }
+    omsAgentEnabled: enableMonitoring
+    monitoringWorkspaceResourceId: enableMonitoring ? logAnalyticsWorkspaceResourceId : null
+    diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
+    securityProfile: enableDefender && enableMonitoring ? {
+      defender: {
+        logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceResourceId
+        securityMonitoring: {
+          enabled: true
         }
       }
     } : {}
+    roleAssignments: roleAssignments
   }
 }
 
@@ -125,16 +149,16 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-03-01' = {
 // Outputs
 // ============================================================================
 @description('Name of the AKS cluster.')
-output name string = aksCluster.name
+output name string = aksCluster.outputs.name
 
 @description('Resource ID of the AKS cluster.')
-output resourceId string = aksCluster.id
+output resourceId string = aksCluster.outputs.resourceId
 
 @description('FQDN of the AKS cluster.')
-output fqdn string = aksCluster.properties.fqdn
+output fqdn string = aksCluster.outputs.?fqdn ?? ''
 
 @description('Object ID of the AKS kubelet system-assigned managed identity (used by pods at runtime via IMDS).')
-output kubeletIdentityObjectId string = aksCluster.properties.?identityProfile.?kubeletidentity.?objectId ?? ''
+output kubeletIdentityObjectId string = aksCluster.outputs.?kubeletIdentityObjectId ?? ''
 
 @description('Principal ID of the AKS control-plane system-assigned managed identity.')
-output systemAssignedMIPrincipalId string = aksCluster.identity.?principalId ?? ''
+output systemAssignedMIPrincipalId string = aksCluster.outputs.?systemAssignedMIPrincipalId ?? ''

@@ -1,8 +1,8 @@
 // ============================================================================
 // Module: Azure AI Services (Generic)
-// Description: Deploys Cognitive Services — supports Content Safety,
+// Description: AVM wrapper for Cognitive Services — supports Content Safety,
 //              Speech, Computer Vision, Document Intelligence, and others.
-// API: Microsoft.CognitiveServices/accounts@2025-04-01
+// AVM Module: avm/res/cognitive-services/account:0.14.2
 // ============================================================================
 
 @description('Solution name suffix used to derive the resource name.')
@@ -34,6 +34,9 @@ param location string
 @description('Tags to apply to the resource.')
 param tags object = {}
 
+@description('Optional. Enable/Disable usage telemetry for module.')
+param enableTelemetry bool = false
+
 @description('SKU for the Cognitive Services account.')
 @allowed(['F0', 'S0', 'S1'])
 param sku string = 'S0'
@@ -48,26 +51,57 @@ param disableLocalAuth bool = true
 @allowed(['Enabled', 'Disabled'])
 param publicNetworkAccess string = 'Enabled'
 
+@description('Whether to enable private networking.')
+param enablePrivateNetworking bool = false
+
+@description('Subnet resource ID for the private endpoint.')
+param privateEndpointSubnetId string = ''
+
+@description('Private DNS zone resource IDs.')
+param privateDnsZoneResourceIds array = []
+
+@description('Diagnostic settings for monitoring.')
+param diagnosticSettings array = []
+
+@description('Optional. Role assignments for the resource.')
+param roleAssignments array = []
+
 var effectiveSubDomain = !empty(customSubDomainName) ? customSubDomainName : name
 
+var privateDnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
+  name: 'dns-zone-${i}'
+  privateDnsZoneResourceId: zoneId
+}]
+
 // ============================================================================
-// Resource
+// AVM Module Deployment
 // ============================================================================
-resource aiService 'Microsoft.CognitiveServices/accounts@2025-12-01' = {
-  name: name
-  location: location
-  tags: tags
-  kind: kind
-  sku: {
-    name: sku
-  }
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
+module aiService 'br/public:avm/res/cognitive-services/account:0.14.2' = {
+  name: take('avm.res.cognitive-services.${namePrefix}.${name}', 64)
+  params: {
+    name: name
+    location: location
+    tags: tags
+    enableTelemetry: enableTelemetry
+    kind: kind
+    sku: sku
     customSubDomainName: effectiveSubDomain
-    publicNetworkAccess: publicNetworkAccess
     disableLocalAuth: disableLocalAuth
+    managedIdentities: { systemAssigned: true }
+    publicNetworkAccess: publicNetworkAccess
+    diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
+    roleAssignments: !empty(roleAssignments) ? roleAssignments : []
+    privateEndpoints: enablePrivateNetworking ? [
+      {
+        name: 'pep-${name}'
+        customNetworkInterfaceName: 'nic-${name}'
+        subnetResourceId: privateEndpointSubnetId
+        service: 'account'
+        privateDnsZoneGroup: {
+          privateDnsZoneGroupConfigs: privateDnsZoneConfigs
+        }
+      }
+    ] : []
   }
 }
 
@@ -75,13 +109,13 @@ resource aiService 'Microsoft.CognitiveServices/accounts@2025-12-01' = {
 // Outputs
 // ============================================================================
 @description('Name of the AI Services account.')
-output name string = aiService.name
+output name string = aiService.outputs.name
 
 @description('Resource ID of the AI Services account.')
-output resourceId string = aiService.id
+output resourceId string = aiService.outputs.resourceId
 
 @description('Endpoint of the AI Services account.')
-output endpoint string = aiService.properties.endpoint
+output endpoint string = aiService.outputs.endpoint
 
 @description('System-assigned identity principal ID.')
-output identityPrincipalId string = aiService.identity.principalId
+output identityPrincipalId string = aiService.outputs.?systemAssignedMIPrincipalId ?? ''
