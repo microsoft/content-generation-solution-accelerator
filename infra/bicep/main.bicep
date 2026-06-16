@@ -122,7 +122,7 @@ param frontendImageName string = 'content-gen-app'
 param backendImageName string = 'content-gen-api'
 
 @description('Optional. Image tag. ACI is only deployed when a real tag (not empty / not "none") is provided.')
-param imageTag string = ''
+param imageTag string = 'latest'
 
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
@@ -529,7 +529,7 @@ module webSite 'modules/compute/app-service.bicep' = {
 // ========== Container Instance (Backend API) ========== //
 // Docker (bicep) flavor: inline ACI definition with managed identity auth for the created ACR.
 var containerInstanceName = 'aci-${solutionSuffix}'
-var backendImageUrl = '${containerRegistry.outputs.loginServer}/${backendImageName}:${imageTag}'
+var backendImageUrl = '${acrName}/${backendImageName}:${imageTag}'
 var aciPort = 8000
 // Construct identity resource ID from known values (required for deployment-time calculation)
 var userAssignedIdentityResourceIdForACI = '/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${userAssignedIdentityResourceName}'
@@ -722,7 +722,7 @@ output CONTAINER_INSTANCE_NAME string = shouldDeployACI ? containerInstance!.nam
 output CONTAINER_INSTANCE_FQDN string = shouldDeployACI ? containerInstance!.properties.ipAddress.fqdn : ''
 
 @description('Contains ACR Name')
-output AZURE_ENV_CONTAINER_REGISTRY_NAME string = containerRegistry.outputs.name
+output AZURE_ENV_CONTAINER_REGISTRY_NAME string = acrName
 
 @description('Contains flag for Azure AI Foundry usage')
 output USE_FOUNDRY bool = useFoundryMode ? true : false

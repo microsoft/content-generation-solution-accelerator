@@ -1,73 +1,52 @@
 // ============================================================================
 // Module: Private Endpoint
-// Description: Vanilla Bicep module for an Azure Private Endpoint with DNS zone group.
-// Resource: Microsoft.Network/privateEndpoints@2024-05-01
-// NOTE: Not used by the lean main.bicep; retained for module parity with the
-//       AVM flavor across GSA.
+// Description: AVM wrapper for Azure Private Endpoint
+// AVM Module: avm/res/network/private-endpoint
+// Usage: Call once per private endpoint from main.bicep
 // ============================================================================
 
-@description('Required. Name of the private endpoint.')
+@description('Name of the private endpoint.')
 param name string
 
-@description('Required. Azure region for the resource.')
+@description('Azure region for the resource.')
 param location string
 
-@description('Optional. Tags to apply to the resource.')
+@description('Tags to apply to the resource.')
 param tags object = {}
 
-@description('Optional. Enable/Disable usage telemetry for module.')
-#disable-next-line no-unused-params
-param enableTelemetry bool = true
+@description('Optional. Custom NIC name for the private endpoint.')
+param customNetworkInterfaceName string = ''
 
-@description('Required. Resource ID of the subnet to deploy the private endpoint into.')
+@description('Resource ID of the subnet for the private endpoint.')
 param subnetResourceId string
 
-@description('Required. Resource ID of the target resource (private link service).')
-param targetResourceId string
+@description('Private link service connections configuration.')
+param privateLinkServiceConnections array
 
-@description('Required. Group IDs (sub-resources) the private endpoint connects to.')
-param groupIds array
+@description('Optional. Private DNS zone group configuration.')
+param privateDnsZoneGroup object?
 
-@description('Optional. Private DNS zone group configurations. Each item: { name, privateDnsZoneResourceId }.')
-param privateDnsZoneConfigs array = []
-
-resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: name
-  location: location
-  tags: tags
-  properties: {
-    subnet: {
-      id: subnetResourceId
-    }
-    privateLinkServiceConnections: [
-      {
-        name: name
-        properties: {
-          privateLinkServiceId: targetResourceId
-          groupIds: groupIds
-        }
-      }
-    ]
+// ============================================================================
+// AVM Module Deployment
+// ============================================================================
+module privateEndpoint 'br/public:avm/res/network/private-endpoint:0.12.0' = {
+  name: take('avm.res.network.private-endpoint.${name}', 64)
+  params: {
+    name: name
+    location: location
+    tags: tags
+    customNetworkInterfaceName: !empty(customNetworkInterfaceName) ? customNetworkInterfaceName : 'nic-${name}'
+    subnetResourceId: subnetResourceId
+    privateLinkServiceConnections: privateLinkServiceConnections
+    privateDnsZoneGroup: privateDnsZoneGroup
   }
 }
 
-resource dnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (!empty(privateDnsZoneConfigs)) {
-  parent: privateEndpoint
-  name: 'default'
-  properties: {
-    privateDnsZoneConfigs: [
-      for (config, i) in privateDnsZoneConfigs: {
-        name: config.?name ?? 'config-${i}'
-        properties: {
-          privateDnsZoneId: config.privateDnsZoneResourceId
-        }
-      }
-    ]
-  }
-}
-
+// ============================================================================
+// Outputs
+// ============================================================================
 @description('Resource ID of the private endpoint.')
-output resourceId string = privateEndpoint.id
+output resourceId string = privateEndpoint.outputs.resourceId
 
 @description('Name of the private endpoint.')
-output name string = privateEndpoint.name
+output name string = privateEndpoint.outputs.name

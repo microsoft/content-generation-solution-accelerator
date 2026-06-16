@@ -1,45 +1,44 @@
 // ============================================================================
 // Module: Private DNS Zone
-// Description: Vanilla Bicep module for a single Private DNS Zone linked to a VNet.
-// Resource: Microsoft.Network/privateDnsZones@2024-06-01
-// NOTE: Not used by the lean main.bicep; retained for module parity with the
-//       AVM flavor across GSA.
+// Description: AVM wrapper for Azure Private DNS Zone
+// AVM Module: avm/res/network/private-dns-zone
+// Usage: Call once per DNS zone from main.bicep
 // ============================================================================
 
-@description('Required. Name of the private DNS zone (e.g. privatelink.blob.core.windows.net).')
+@description('Name of the private DNS zone (e.g., privatelink.cognitiveservices.azure.com).')
 param name string
 
-@description('Optional. Tags to apply to the resource.')
+@description('Tags to apply to the resource.')
 param tags object = {}
 
 @description('Optional. Enable/Disable usage telemetry for module.')
-#disable-next-line no-unused-params
 param enableTelemetry bool = true
 
-@description('Required. Resource ID of the virtual network to link.')
-param virtualNetworkResourceId string
+@description('Virtual network links to associate with the DNS zone.')
+param virtualNetworkLinks array = []
 
-resource zone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
-  name: name
-  location: 'global'
-  tags: tags
-}
+@description('Optional. Array of A records.')
+param a array = []
 
-resource virtualNetworkLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = {
-  parent: zone
-  name: '${last(split(virtualNetworkResourceId, '/'))}-link'
-  location: 'global'
-  tags: tags
-  properties: {
-    registrationEnabled: false
-    virtualNetwork: {
-      id: virtualNetworkResourceId
-    }
+// ============================================================================
+// AVM Module Deployment
+// ============================================================================
+module privateDnsZone 'br/public:avm/res/network/private-dns-zone:0.8.1' = {
+  name: take('avm.res.network.private-dns-zone.${split(name, '.')[1]}', 64)
+  params: {
+    name: name
+    tags: tags
+    enableTelemetry: enableTelemetry
+    virtualNetworkLinks: virtualNetworkLinks
+    a: a
   }
 }
 
+// ============================================================================
+// Outputs
+// ============================================================================
 @description('Resource ID of the private DNS zone.')
-output resourceId string = zone.id
+output resourceId string = privateDnsZone.outputs.resourceId
 
 @description('Name of the private DNS zone.')
-output name string = zone.name
+output name string = privateDnsZone.outputs.name
