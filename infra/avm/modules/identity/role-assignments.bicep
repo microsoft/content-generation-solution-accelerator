@@ -231,3 +231,4 @@ resource backendAppCosmosRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/s
   }
 }
 
+ 

@@ -69,6 +69,9 @@ param enableAutomaticFailover bool = false
 @description('Optional. HA paired region for multi-region failover when redundancy is enabled.')
 param haLocation string = ''
 
+@description('Optional. Managed identities for the resource.')
+param managedIdentities object = { systemAssigned: true }
+
 // ============================================================================
 // AVM Module Deployment
 // ============================================================================
@@ -91,7 +94,7 @@ module cosmosAccount 'br/public:avm/res/document-db/database-account:0.19.0' = {
     ]
     diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
     networkRestrictions: {
-      networkAclBypass: 'None'
+      networkAclBypass: 'AzureServices'
       publicNetworkAccess: publicNetworkAccess
     }
     privateEndpoints: enablePrivateNetworking ? [
@@ -107,6 +110,7 @@ module cosmosAccount 'br/public:avm/res/document-db/database-account:0.19.0' = {
     ] : []
     zoneRedundant: zoneRedundant
     enableAutomaticFailover: enableAutomaticFailover
+    managedIdentities: managedIdentities
     failoverLocations: zoneRedundant && !empty(haLocation)
       ? [
           { failoverPriority: 0, isZoneRedundant: true, locationName: location }

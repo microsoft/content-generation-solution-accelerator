@@ -67,6 +67,9 @@ param autoUpgradeChannel string = 'stable'
 @description('Log Analytics workspace resource ID for monitoring.')
 param logAnalyticsWorkspaceResourceId string = ''
 
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
+
 // ============================================================================
 // Variables
 // ============================================================================
@@ -79,9 +82,7 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-03-01' = {
   name: name
   location: location
   tags: tags
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity: identity
   sku: {
     name: 'Base'
     tier: skuTier
@@ -132,3 +133,9 @@ output resourceId string = aksCluster.id
 
 @description('FQDN of the AKS cluster.')
 output fqdn string = aksCluster.properties.fqdn
+
+@description('Object ID of the AKS kubelet system-assigned managed identity (used by pods at runtime via IMDS).')
+output kubeletIdentityObjectId string = aksCluster.properties.?identityProfile.?kubeletidentity.?objectId ?? ''
+
+@description('Principal ID of the AKS control-plane system-assigned managed identity.')
+output systemAssignedMIPrincipalId string = aksCluster.identity.?principalId ?? ''

@@ -22,10 +22,8 @@ param storageAccountResourceId string
 @description('Name of the storage account.')
 param storageAccountName string
 
-@description('Managed identity configuration.')
-param managedIdentities object = {
-  systemAssigned: true
-}
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
 
 @description('App settings as name-value pairs.')
 param appSettings array = []
@@ -41,12 +39,7 @@ param runtimeVersion string = '3.11'
 
 // ============================================================================
 // Variables
-// ============================================================================
-var identityConfig = empty(managedIdentities) ? null : {
-  type: contains(managedIdentities, 'userAssignedResourceIds') ? (contains(managedIdentities, 'systemAssigned') && managedIdentities.systemAssigned ? 'SystemAssigned,UserAssigned' : 'UserAssigned') : 'SystemAssigned'
-  userAssignedIdentities: contains(managedIdentities, 'userAssignedResourceIds') ? reduce(managedIdentities.userAssignedResourceIds, {}, (cur, id) => union(cur, { '${id}': {} })) : null
-}
-
+// ===========================================================================
 var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${listKeys(storageAccountResourceId, '2023-05-01').keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
 var linuxFxVersion = '${toUpper(runtimeStack)}|${runtimeVersion}'
 
@@ -76,7 +69,7 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
   location: location
   tags: tags
   kind: 'functionapp,linux'
-  identity: identityConfig
+  identity: identity
   properties: {
     serverFarmId: serverFarmResourceId
     siteConfig: effectiveSiteConfig

@@ -26,6 +26,9 @@ param disableLocalAuth bool = true
 @description('Key-value pairs to store in the configuration.')
 param keyValues array = []
 
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
+
 // ============================================================================
 // Resource Deployment
 // ============================================================================
@@ -33,6 +36,7 @@ resource appConfiguration 'Microsoft.AppConfiguration/configurationStores@2023-0
   name: name
   location: location
   tags: tags
+  identity: identity
   sku: {
     name: sku
   }

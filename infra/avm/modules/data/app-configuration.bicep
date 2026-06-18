@@ -30,14 +30,17 @@ param enablePurgeProtection bool = false
 @description('Soft delete retention in days.')
 param softDeleteRetentionInDays int = 7
 
-@description('Managed identity configuration.')
-param managedIdentities object = {}
+@description('Optional. Managed identities for the resource.')
+param managedIdentities object = { systemAssigned: true }
 
 @description('Role assignments.')
 param roleAssignments array = []
 
 @description('Key-value pairs to store in the configuration.')
 param keyValues array = []
+
+@description('Optional. Public network access override. Set to Enabled to allow ARM keyValues writes during deploy.')
+param publicNetworkAccess string = ''
 
 @description('Enable private networking.')
 param enablePrivateNetworking bool = false
@@ -77,9 +80,10 @@ module configStore 'br/public:avm/res/app-configuration/configuration-store:0.9.
     disableLocalAuth: disableLocalAuth
     enablePurgeProtection: enablePurgeProtection
     softDeleteRetentionInDays: softDeleteRetentionInDays
-    managedIdentities: !empty(managedIdentities) ? managedIdentities : {}
+    managedIdentities: managedIdentities
     roleAssignments: !empty(roleAssignments) ? roleAssignments : []
     keyValues: !empty(keyValues) ? keyValues : []
+    publicNetworkAccess: !empty(publicNetworkAccess) ? publicNetworkAccess : null
     privateEndpoints: privateEndpointConfig
   }
 }

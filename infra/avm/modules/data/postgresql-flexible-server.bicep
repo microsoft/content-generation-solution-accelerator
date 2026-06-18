@@ -75,6 +75,9 @@ param highAvailability string = 'Disabled'
 @description('Standby availability zone for high availability.')
 param highAvailabilityZone int = -1
 
+@description('Optional. Managed identities for the resource.')
+param managedIdentities object = { systemAssigned: true }
+
 // ============================================================================
 // AVM Module Deployment
 // ============================================================================
@@ -94,6 +97,7 @@ module postgresServer 'br/public:avm/res/db-for-postgre-sql/flexible-server:0.15
     highAvailabilityZone: highAvailabilityZone
     publicNetworkAccess: publicNetworkAccess
     diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
+    managedIdentities: managedIdentities
     administrators: [for admin in administrators: {
       objectId: admin.objectId
       principalName: admin.principalName

@@ -57,6 +57,9 @@ param privateEndpointSubnetId string = ''
 @description('Private DNS zone resource IDs for SQL Server.')
 param privateDnsZoneResourceIds array = []
 
+@description('Optional. Managed identities for the resource.')
+param managedIdentities object = { systemAssigned: true }
+
 var privateDnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
   name: 'dns-zone-${i}'
   privateDnsZoneResourceId: zoneId
@@ -75,6 +78,7 @@ module sqlServer 'br/public:avm/res/sql/server:0.21.1' = {
     minimalTlsVersion: '1.2'
     publicNetworkAccess: publicNetworkAccess
     restrictOutboundNetworkAccess: 'Disabled'
+    managedIdentities: managedIdentities
     administrators: {
       azureADOnlyAuthentication: true
       login: deployerPrincipalId

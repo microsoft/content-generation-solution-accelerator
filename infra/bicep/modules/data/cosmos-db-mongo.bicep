@@ -45,6 +45,9 @@ param haLocation string = ''
 @description('Public network access setting.')
 param publicNetworkAccess string = 'Enabled'
 
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
+
 // ============================================================================
 // Resource Deployment
 // ============================================================================
@@ -53,6 +56,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2025-10-15' = {
   location: location
   tags: tags
   kind: 'MongoDB'
+  identity: identity
   properties: {
     consistencyPolicy: { defaultConsistencyLevel: consistencyLevel }
     locations: zoneRedundant && !empty(haLocation)

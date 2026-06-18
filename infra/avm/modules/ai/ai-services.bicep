@@ -66,6 +66,9 @@ param diagnosticSettings array = []
 @description('Optional. Role assignments for the resource.')
 param roleAssignments array = []
 
+@description('Optional. Managed identities for the resource.')
+param managedIdentities object = { systemAssigned: true }
+
 var effectiveSubDomain = !empty(customSubDomainName) ? customSubDomainName : name
 
 var privateDnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
@@ -87,7 +90,7 @@ module aiService 'br/public:avm/res/cognitive-services/account:0.14.2' = {
     sku: sku
     customSubDomainName: effectiveSubDomain
     disableLocalAuth: disableLocalAuth
-    managedIdentities: { systemAssigned: true }
+    managedIdentities: managedIdentities
     publicNetworkAccess: publicNetworkAccess
     diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
     roleAssignments: !empty(roleAssignments) ? roleAssignments : []

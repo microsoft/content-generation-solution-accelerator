@@ -48,6 +48,9 @@ param disableLocalAuth bool = true
 @allowed(['Enabled', 'Disabled'])
 param publicNetworkAccess string = 'Enabled'
 
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
+
 var effectiveSubDomain = !empty(customSubDomainName) ? customSubDomainName : name
 
 // ============================================================================
@@ -61,9 +64,7 @@ resource aiService 'Microsoft.CognitiveServices/accounts@2025-12-01' = {
   sku: {
     name: sku
   }
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity: identity
   properties: {
     customSubDomainName: effectiveSubDomain
     publicNetworkAccess: publicNetworkAccess

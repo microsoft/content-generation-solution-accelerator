@@ -31,8 +31,8 @@ param eventSubscriptions array = []
 @description('Diagnostic settings for monitoring.')
 param diagnosticSettings array = []
 
-@description('Managed identities configuration.')
-param managedIdentities object = {}
+@description('Optional. Managed identities for the resource.')
+param managedIdentities object = { systemAssigned: true }
 
 // ============================================================================
 // AVM Module Deployment
@@ -48,7 +48,7 @@ module eventGridSystemTopic 'br/public:avm/res/event-grid/system-topic:0.6.5' = 
     topicType: topicType
     eventSubscriptions: eventSubscriptions
     diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
-    managedIdentities: !empty(managedIdentities) ? managedIdentities : null
+    managedIdentities: managedIdentities
   }
 }
 

@@ -1,94 +1,114 @@
 // ============================================================================
-// Module: Cosmos DB (NoSQL)
-// Description: AVM wrapper for an Azure Cosmos DB account (SQL/NoSQL API)
-//              used for conversation history and product metadata.
+// Module: Cosmos DB
+// Description: AVM wrapper for Azure Cosmos DB (NoSQL) with WAF alignment
 // AVM Module: avm/res/document-db/database-account:0.19.0
+// WAF: https://learn.microsoft.com/azure/well-architected/service-guides/cosmos-db
 // ============================================================================
 
-@description('Required. Name of the Cosmos DB account.')
-param name string
+@description('Solution name suffix used to derive the resource name.')
+param solutionName string
 
-@description('Required. Azure region for the resource.')
+@description('Name of the Cosmos DB account.')
+param name string = 'cosmos-${solutionName}'
+
+@description('Azure region for the resource.')
 param location string
 
-@description('Optional. Tags to apply to the resource.')
+@description('Tags to apply to the resource.')
 param tags object = {}
+
+@description('Database name.')
+param databaseName string = 'db_conversation_history'
+
+@description('Container definitions.')
+param containers array = [
+  {
+    name: 'conversations'
+    partitionKeyPath: '/userId'
+  }
+]
 
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
 
-@description('Required. Name of the SQL database.')
-param databaseName string
-
-@description('Required. Containers to create in the SQL database.')
-param containers array
-
-@description('Required. Principal ID of the managed identity to grant data contributor.')
-param principalId string
-
-@description('Required. Principal ID of the deploying user/service principal.')
-param deployerPrincipalId string
-
-@description('Optional. Enable redundancy (zone redundancy + automatic failover).')
-param enableRedundancy bool = false
-
-@description('Optional. High-availability failover region used when redundancy is enabled.')
-param haLocation string = ''
-
-@description('Optional. Enable private networking (disables public access, adds private endpoint).')
-param enablePrivateNetworking bool = false
-
-@description('Optional. Subnet resource ID for the private endpoint.')
-param subnetResourceId string = ''
-
-@description('Optional. Resource ID of the Cosmos DB private DNS zone.')
-param cosmosDnsZoneResourceId string = ''
-
-@description('Optional. Diagnostic settings for monitoring.')
+// --- WAF: Monitoring ---
+@description('Diagnostic settings for monitoring.')
 param diagnosticSettings array = []
 
-module cosmos 'br/public:avm/res/document-db/database-account:0.19.0' = {
+// --- WAF: Private Networking ---
+@description('Public network access setting.')
+param publicNetworkAccess string = 'Enabled'
+
+@description('Whether to enable private networking.')
+param enablePrivateNetworking bool = false
+
+@description('Subnet resource ID for the private endpoint.')
+param privateEndpointSubnetId string = ''
+
+@description('Private DNS zone resource IDs for Cosmos DB.')
+param privateDnsZoneResourceIds array = []
+
+var privateDnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
+  name: 'dns-zone-${i}'
+  privateDnsZoneResourceId: zoneId
+}]
+
+// --- WAF: Redundancy ---
+@description('Enable zone redundancy.')
+param zoneRedundant bool = false
+
+@description('Enable automatic failover.')
+param enableAutomaticFailover bool = false
+
+@description('Optional. HA paired region for multi-region failover when redundancy is enabled.')
+param haLocation string = ''
+
+@description('Optional. Managed identities for the resource.')
+param managedIdentities object = { systemAssigned: true }
+
+// ============================================================================
+// AVM Module Deployment
+// ============================================================================
+module cosmosAccount 'br/public:avm/res/document-db/database-account:0.19.0' = {
   name: take('avm.res.document-db.database-account.${name}', 64)
   params: {
     name: name
     location: location
     tags: tags
     enableTelemetry: enableTelemetry
+    capabilitiesToAdd: zoneRedundant ? [] : ['EnableServerless']
     sqlDatabases: [
       {
         name: databaseName
-        containers: containers
+        containers: [for container in containers: {
+          name: container.name
+          paths: [container.partitionKeyPath]
+          kind: 'Hash'
+          version: 2
+        }]
       }
     ]
-    sqlRoleDefinitions: [
-      {
-        roleName: 'contentgen-data-contributor'
-        dataActions: [
-          'Microsoft.DocumentDB/databaseAccounts/readMetadata'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*'
-        ]
-      }
-    ]
-    sqlRoleAssignments: [
-      {
-        principalId: principalId
-        roleDefinitionId: '00000000-0000-0000-0000-000000000002' // Built-in Cosmos DB Data Contributor
-      }
-      {
-        principalId: deployerPrincipalId
-        roleDefinitionId: '00000000-0000-0000-0000-000000000002' // Built-in Cosmos DB Data Contributor to the deployer
-      }
-    ]
-    diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : null
+    sqlRoleAssignments: []
+    diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
     networkRestrictions: {
-      networkAclBypass: 'AzureServices'
-      publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
+      networkAclBypass: 'None'
+      publicNetworkAccess: publicNetworkAccess
     }
-    zoneRedundant: enableRedundancy
-    capabilitiesToAdd: enableRedundancy ? null : ['EnableServerless']
-    enableAutomaticFailover: enableRedundancy
-    failoverLocations: enableRedundancy
+    privateEndpoints: enablePrivateNetworking ? [
+      {
+        name: 'pep-${name}'
+        customNetworkInterfaceName: 'nic-${name}'
+        subnetResourceId: privateEndpointSubnetId
+        service: 'Sql'
+        privateDnsZoneGroup: {
+          privateDnsZoneGroupConfigs: privateDnsZoneConfigs
+        }
+      }
+    ] : []
+    zoneRedundant: zoneRedundant
+    enableAutomaticFailover: enableAutomaticFailover
+    managedIdentities: managedIdentities
+    failoverLocations: zoneRedundant
       ? [
           {
             failoverPriority: 0
@@ -108,24 +128,23 @@ module cosmos 'br/public:avm/res/document-db/database-account:0.19.0' = {
             isZoneRedundant: false
           }
         ]
-    privateEndpoints: enablePrivateNetworking
-      ? [
-          {
-            service: 'Sql'
-            subnetResourceId: subnetResourceId
-            privateDnsZoneGroup: {
-              privateDnsZoneGroupConfigs: [
-                { privateDnsZoneResourceId: cosmosDnsZoneResourceId }
-              ]
-            }
-          }
-        ]
-      : null
   }
 }
 
+// ============================================================================
+// Outputs
+// ============================================================================
 @description('Resource ID of the Cosmos DB account.')
-output resourceId string = cosmos.outputs.resourceId
+output resourceId string = cosmosAccount.outputs.resourceId
 
 @description('Name of the Cosmos DB account.')
-output name string = cosmos.outputs.name
+output name string = cosmosAccount.outputs.name
+
+@description('Endpoint of the Cosmos DB account.')
+output endpoint string = 'https://${name}.documents.azure.com:443/'
+
+@description('Database name.')
+output databaseName string = databaseName
+
+@description('Container name (first container).')
+output containerName string = containers[0].name

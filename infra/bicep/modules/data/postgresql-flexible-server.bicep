@@ -32,10 +32,14 @@ param databases array = []
 @description('Optional server configurations (e.g., extensions). Each entry should have a name, value, and source.')
 param configurations array = []
 
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
+
 resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2026-01-01-preview' = {
   name: name
   location: location
   tags: tags
+  identity: identity
   sku: {
     name: skuName
     tier: skuTier

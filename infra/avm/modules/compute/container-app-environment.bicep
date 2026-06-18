@@ -50,6 +50,9 @@ param workloadProfiles array = [
   }
 ]
 
+@description('Optional. Managed identities for the resource.')
+param managedIdentities object = { systemAssigned: true }
+
 // ============================================================================
 // Container Apps Environment (AVM)
 // ============================================================================
@@ -76,6 +79,7 @@ module managedEnvironment 'br/public:avm/res/app/managed-environment:0.13.3' = {
     zoneRedundant: zoneRedundant || enableRedundancy
     infrastructureResourceGroupName: !empty(infrastructureResourceGroupName) ? infrastructureResourceGroupName : null
     workloadProfiles: workloadProfiles
+    managedIdentities: managedIdentities
   }
 }
 

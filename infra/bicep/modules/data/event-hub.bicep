@@ -25,6 +25,9 @@ param capacity int = 1
 @description('Event hubs to create within the namespace.')
 param eventhubs array = []
 
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
+
 // ============================================================================
 // Resource Deployment
 // ============================================================================
@@ -37,6 +40,7 @@ resource eventHubNamespace 'Microsoft.EventHub/namespaces@2024-01-01' = {
     tier: sku
     capacity: capacity
   }
+  identity: identity
   properties: {
     minimumTlsVersion: '1.2'
     publicNetworkAccess: 'Enabled'

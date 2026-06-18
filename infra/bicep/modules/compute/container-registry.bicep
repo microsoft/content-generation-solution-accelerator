@@ -1,58 +1,82 @@
 // ============================================================================
-// Module: Container Registry
-// Description: Vanilla Bicep module for an Azure Container Registry used by the
-//              Docker build (bicep) deployment flavor. AZD builds and pushes the
-//              application images here.
-// Resource: Microsoft.ContainerRegistry/registries@2023-11-01-preview
+// Module: Azure Container Registry
+// Description: Creates an Azure Container Registry
+// API: Microsoft.ContainerRegistry/registries@2025-04-01
 // ============================================================================
 
-@description('Required. Name of the container registry.')
-param name string
+@description('Solution name used for naming convention.')
+param solutionName string
 
-@description('Required. Azure region for the resource.')
+@description('Name of the container registry.')
+param name string = replace('cr${solutionName}', '-', '')
+
+@description('Azure region for deployment.')
 param location string
 
-@description('Optional. Tags to apply to the resource.')
+@description('Resource tags.')
 param tags object = {}
 
-@description('Optional. Enable/Disable usage telemetry for module.')
-#disable-next-line no-unused-params
-param enableTelemetry bool = true
+@description('SKU for the container registry.')
+@allowed(['Basic', 'Standard', 'Premium'])
+param sku string = 'Standard'
 
-@description('Required. Principal ID of the managed identity to grant AcrPull.')
-param principalId string
+@description('Enable admin user.')
+param adminUserEnabled bool = false
 
-resource registry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = {
+@description('Public network access setting.')
+@allowed(['Enabled', 'Disabled'])
+param publicNetworkAccess string = 'Enabled'
+
+@description('Export policy status.')
+param exportPolicyStatus string = 'enabled'
+
+@description('Retention policy status.')
+param retentionPolicyStatus string = 'disabled'
+
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
+
+// ============================================================================
+// Resource Deployment
+// ============================================================================
+resource containerRegistry 'Microsoft.ContainerRegistry/registries@2025-04-01' = {
   name: name
   location: location
   tags: tags
   sku: {
-    name: 'Standard'
+    name: sku
   }
+  identity: identity
   properties: {
-    adminUserEnabled: false
-    anonymousPullEnabled: false
-    publicNetworkAccess: 'Enabled'
+    adminUserEnabled: adminUserEnabled
+    publicNetworkAccess: publicNetworkAccess
+    dataEndpointEnabled: false
     networkRuleBypassOptions: 'AzureServices'
+    policies: {
+      exportPolicy: {
+        status: exportPolicyStatus
+      }
+      retentionPolicy: {
+        status: retentionPolicyStatus
+        days: 7
+      }
+      trustPolicy: {
+        status: 'disabled'
+        type: 'Notary'
+      }
+    }
+    zoneRedundancy: 'Disabled'
   }
 }
 
-// AcrPull role assignment for the managed identity.
-resource acrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(registry.id, principalId, '7f951dda-4ed3-4680-a7ca-43fe172d538d')
-  scope: registry
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d') // AcrPull
-    principalId: principalId
-    principalType: 'ServicePrincipal'
-  }
-}
+// ============================================================================
+// Outputs
+// ============================================================================
+@description('The name of the container registry.')
+output name string = containerRegistry.name
 
-@description('Resource ID of the container registry.')
-output resourceId string = registry.id
+@description('The login server URL.')
+output loginServer string = containerRegistry.properties.loginServer
 
-@description('Name of the container registry.')
-output name string = registry.name
-
-@description('Login server of the container registry.')
-output loginServer string = registry.properties.loginServer
+@description('The resource ID of the container registry.')
+output resourceId string = containerRegistry.id

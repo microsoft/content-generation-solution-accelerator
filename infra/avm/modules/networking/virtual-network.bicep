@@ -1,119 +1,122 @@
-/****************************************************************************************************************************/
-// Networking - NSGs, VNET and Subnets for Content Generation Solution
-/****************************************************************************************************************************/
-@description('Name of the virtual network.')
-param vnetName string
+// ============================================================================
+// Module: Virtual Network
+// Description: VNet, Subnets, and NSGs using AVM modules.
+//              Each subnet gets its own NSG. Subnet config is passed as param.
+// AVM Modules:
+//   - avm/res/network/network-security-group:0.5.3
+//   - avm/res/network/virtual-network:0.8.0
+// ============================================================================
 
-@description('Azure region to deploy resources.')
+@description('Solution name suffix used to derive the resource name.')
+param solutionName string
+
+var name = 'vnet-${solutionName}'
+
+@description('Azure region for the resource.')
 param location string = resourceGroup().location
 
-@description('Required. An Array of 1 or more IP Address Prefixes for the Virtual Network.')
-param addressPrefixes array = ['10.0.0.0/20']
+@description('Address prefixes for the virtual network.')
+param addressPrefixes array
 
-@description('Optional. Deploy Azure Bastion and Jumpbox subnets for VM-based administration.')
-param deployBastionAndJumpbox bool = false
-
-@description('An array of subnets to be created within the virtual network.')
-// Core subnets: web (App Service), peps (Private Endpoints), aci (Container Instance)
-// Optional: AzureBastionSubnet and jumpbox (only when deployBastionAndJumpbox is true)
-var coreSubnets = [
+@description('Subnet configurations.')
+param subnets subnetType[] = [
   {
-    name: 'web'
-    addressPrefixes: ['10.0.0.0/23']
-    delegation: 'Microsoft.Web/serverFarms'
+    name: 'backend'
+    addressPrefixes: ['10.0.0.0/27']
     networkSecurityGroup: {
-      name: 'nsg-web'
+      name: 'nsg-backend'
       securityRules: [
         {
-          name: 'AllowHttpsInbound'
+          name: 'deny-hop-outbound'
           properties: {
-            access: 'Allow'
-            direction: 'Inbound'
-            priority: 100
-            protocol: 'Tcp'
-            sourcePortRange: '*'
-            destinationPortRange: '443'
-            sourceAddressPrefixes: ['0.0.0.0/0']
-            destinationAddressPrefixes: ['10.0.0.0/23']
-          }
-        }
-        {
-          name: 'AllowIntraSubnetTraffic'
-          properties: {
-            access: 'Allow'
-            direction: 'Inbound'
+            access: 'Deny'
+            destinationAddressPrefix: '*'
+            destinationPortRanges: ['22', '3389']
+            direction: 'Outbound'
             priority: 200
-            protocol: '*'
+            protocol: 'Tcp'
+            sourceAddressPrefix: 'VirtualNetwork'
             sourcePortRange: '*'
-            destinationPortRange: '*'
-            sourceAddressPrefixes: ['10.0.0.0/23']
-            destinationAddressPrefixes: ['10.0.0.0/23']
-          }
-        }
-        {
-          name: 'AllowAzureLoadBalancer'
-          properties: {
-            access: 'Allow'
-            direction: 'Inbound'
-            priority: 300
-            protocol: '*'
-            sourcePortRange: '*'
-            destinationPortRange: '*'
-            sourceAddressPrefix: 'AzureLoadBalancer'
-            destinationAddressPrefix: '10.0.0.0/23'
           }
         }
       ]
     }
   }
   {
-    name: 'peps'
+    name: 'containers'
     addressPrefixes: ['10.0.2.0/23']
-    privateEndpointNetworkPolicies: 'Disabled'
-    privateLinkServiceNetworkPolicies: 'Disabled'
+    delegation: 'Microsoft.App/environments'
+    privateEndpointNetworkPolicies: 'Enabled'
+    privateLinkServiceNetworkPolicies: 'Enabled'
     networkSecurityGroup: {
-      name: 'nsg-peps'
-      securityRules: []
-    }
-  }
-  {
-    name: 'aci'
-    addressPrefixes: ['10.0.4.0/24']
-    delegation: 'Microsoft.ContainerInstance/containerGroups'
-    networkSecurityGroup: {
-      name: 'nsg-aci'
+      name: 'nsg-containers'
       securityRules: [
         {
-          name: 'AllowHttpsInbound'
+          name: 'deny-hop-outbound'
           properties: {
-            access: 'Allow'
-            direction: 'Inbound'
-            priority: 100
+            access: 'Deny'
+            destinationAddressPrefix: '*'
+            destinationPortRanges: ['22', '3389']
+            direction: 'Outbound'
+            priority: 200
             protocol: 'Tcp'
+            sourceAddressPrefix: 'VirtualNetwork'
             sourcePortRange: '*'
-            destinationPortRange: '8000'
-            sourceAddressPrefixes: ['10.0.0.0/20']
-            destinationAddressPrefixes: ['10.0.4.0/24']
           }
         }
       ]
     }
   }
-]
-
-// Bastion and Jumpbox subnets (only deployed when deployBastionAndJumpbox is true)
-// VM Size Notes:
-// 1 B-series VMs (like Standard_B2ms) do not support accelerated networking.
-// 2 Pick a VM size that supports accelerated networking + Premium SSD (the usual jump-box candidates):
-//   Standard_D2s_v5  (2 vCPU, 8 GiB RAM, Premium SSD/v2/Ultra)  // DEFAULT - current-gen Intel, broad regional availability.
-//   Standard_D2as_v5 (2 vCPU, 8 GiB RAM, Premium SSD/Ultra)     // AMD alternative, typically ~15% cheaper.
-//   Standard_D2s_v4  (2 vCPU, 8 GiB RAM, Premium SSD)           // Previous gen, also broadly available.
-//   Standard_DS2_v2  (2 vCPU, 7 GiB RAM, Premium SSD)           // Legacy SKU, being retired from some regions - avoid for new deployments.
-// 3 A-series (Av2) is NOT suitable: no Premium SSD support, no accelerated networking.
-var bastionSubnets = deployBastionAndJumpbox ? [
+  {
+    name: 'webserverfarm'
+    addressPrefixes: ['10.0.4.0/27']
+    delegation: 'Microsoft.Web/serverfarms'
+    privateEndpointNetworkPolicies: 'Enabled'
+    privateLinkServiceNetworkPolicies: 'Enabled'
+    networkSecurityGroup: {
+      name: 'nsg-webserverfarm'
+      securityRules: [
+        {
+          name: 'deny-hop-outbound'
+          properties: {
+            access: 'Deny'
+            destinationAddressPrefix: '*'
+            destinationPortRanges: ['22', '3389']
+            direction: 'Outbound'
+            priority: 200
+            protocol: 'Tcp'
+            sourceAddressPrefix: 'VirtualNetwork'
+            sourcePortRange: '*'
+          }
+        }
+      ]
+    }
+  }
+  {
+    name: 'administration'
+    addressPrefixes: ['10.0.0.32/27']
+    networkSecurityGroup: {
+      name: 'nsg-administration'
+      securityRules: [
+        {
+          name: 'deny-hop-outbound'
+          properties: {
+            access: 'Deny'
+            destinationAddressPrefix: '*'
+            destinationPortRanges: ['22', '3389']
+            direction: 'Outbound'
+            priority: 200
+            protocol: 'Tcp'
+            sourceAddressPrefix: 'VirtualNetwork'
+            sourcePortRange: '*'
+          }
+        }
+      ]
+    }
+  }
   {
     name: 'AzureBastionSubnet'
-    addressPrefixes: ['10.0.10.0/26']
+    addressPrefixes: ['10.0.0.64/26']
     networkSecurityGroup: {
       name: 'nsg-bastion'
       securityRules: [
@@ -172,49 +175,27 @@ var bastionSubnets = deployBastionAndJumpbox ? [
       ]
     }
   }
-  {
-    name: 'jumpbox'
-    addressPrefixes: ['10.0.12.0/23']
-    networkSecurityGroup: {
-      name: 'nsg-jumpbox'
-      securityRules: [
-        {
-          name: 'AllowRdpFromBastion'
-          properties: {
-            access: 'Allow'
-            direction: 'Inbound'
-            priority: 100
-            protocol: 'Tcp'
-            sourcePortRange: '*'
-            destinationPortRange: '3389'
-            sourceAddressPrefixes: ['10.0.10.0/26']
-            destinationAddressPrefixes: ['10.0.12.0/23']
-          }
-        }
-      ]
-    }
-  }
-] : []
+]
 
-var vnetSubnets = concat(coreSubnets, bastionSubnets)
-
-@description('Optional. Tags to be applied to the resources.')
+@description('Tags to apply to the resources.')
 param tags object = {}
 
-@description('Optional. The resource ID of the Log Analytics Workspace to send diagnostic logs to.')
-param logAnalyticsWorkspaceId string = ''
+@description('Resource ID of the Log Analytics Workspace for diagnostics.')
+param logAnalyticsWorkspaceId string
 
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
 
-@description('Required. Suffix for resource naming.')
+@description('Suffix for resource naming.')
 param resourceSuffix string
 
-// Create NSGs for subnets using AVM Network Security Group module
+// ============================================================================
+// NSGs — one per subnet
+// ============================================================================
 @batchSize(1)
 module nsgs 'br/public:avm/res/network/network-security-group:0.5.3' = [
-  for (subnet, i) in vnetSubnets: if (!empty(subnet.?networkSecurityGroup)) {
-    name: take('avm.res.network.network-security-group.${subnet.?networkSecurityGroup.name}.${resourceSuffix}', 64)
+  for (subnet, i) in subnets: if (!empty(subnet.?networkSecurityGroup)) {
+    name: take('avm.res.network.nsg.${subnet.?networkSecurityGroup.name}.${resourceSuffix}', 64)
     params: {
       name: '${subnet.?networkSecurityGroup.name}-${resourceSuffix}'
       location: location
@@ -225,15 +206,17 @@ module nsgs 'br/public:avm/res/network/network-security-group:0.5.3' = [
   }
 ]
 
-// Create VNet and subnets using AVM Virtual Network module
+// ============================================================================
+// Virtual Network + Subnets
+// ============================================================================
 module virtualNetwork 'br/public:avm/res/network/virtual-network:0.8.0' = {
-  name: take('avm.res.network.virtual-network.${vnetName}', 64)
+  name: take('avm.res.network.virtual-network.${name}', 64)
   params: {
-    name: vnetName
+    name: name
     location: location
     addressPrefixes: addressPrefixes
     subnets: [
-      for (subnet, i) in vnetSubnets: {
+      for (subnet, i) in subnets: {
         name: subnet.name
         addressPrefixes: subnet.?addressPrefixes
         networkSecurityGroupResourceId: !empty(subnet.?networkSecurityGroup) ? nsgs[i]!.outputs.resourceId : null
@@ -242,7 +225,7 @@ module virtualNetwork 'br/public:avm/res/network/virtual-network:0.8.0' = {
         delegation: subnet.?delegation
       }
     ]
-    diagnosticSettings: !empty(logAnalyticsWorkspaceId) ? [
+    diagnosticSettings: [
       {
         name: 'vnetDiagnostics'
         workspaceResourceId: logAnalyticsWorkspaceId
@@ -259,20 +242,90 @@ module virtualNetwork 'br/public:avm/res/network/virtual-network:0.8.0' = {
           }
         ]
       }
-    ] : []
+    ]
     tags: tags
     enableTelemetry: enableTelemetry
   }
 }
 
+// ============================================================================
+// Outputs
+// ============================================================================
 output name string = virtualNetwork.outputs.name
 output resourceId string = virtualNetwork.outputs.resourceId
 
-// Core subnet outputs (always present)
-output webSubnetResourceId string = contains(map(vnetSubnets, subnet => subnet.name), 'web') ? virtualNetwork.outputs.subnetResourceIds[indexOf(map(vnetSubnets, subnet => subnet.name), 'web')] : ''
-output pepsSubnetResourceId string = contains(map(vnetSubnets, subnet => subnet.name), 'peps') ? virtualNetwork.outputs.subnetResourceIds[indexOf(map(vnetSubnets, subnet => subnet.name), 'peps')] : ''
-output aciSubnetResourceId string = contains(map(vnetSubnets, subnet => subnet.name), 'aci') ? virtualNetwork.outputs.subnetResourceIds[indexOf(map(vnetSubnets, subnet => subnet.name), 'aci')] : ''
+output subnets subnetOutputType[] = [
+  for (subnet, i) in subnets: {
+    name: subnet.name
+    resourceId: virtualNetwork.outputs.subnetResourceIds[i]
+    nsgName: !empty(subnet.?networkSecurityGroup) ? subnet.?networkSecurityGroup.name : null
+    nsgResourceId: !empty(subnet.?networkSecurityGroup) ? nsgs[i]!.outputs.resourceId : null
+  }
+]
 
-// Bastion/jumpbox subnet outputs (always declared; will be empty when those subnets are not deployed)
-output bastionSubnetResourceId string = contains(map(vnetSubnets, subnet => subnet.name), 'AzureBastionSubnet') ? virtualNetwork.outputs.subnetResourceIds[indexOf(map(vnetSubnets, subnet => subnet.name), 'AzureBastionSubnet')] : ''
-output jumpboxSubnetResourceId string = contains(map(vnetSubnets, subnet => subnet.name), 'jumpbox') ? virtualNetwork.outputs.subnetResourceIds[indexOf(map(vnetSubnets, subnet => subnet.name), 'jumpbox')] : ''
+// Individual subnet outputs for backward compatibility
+output backendSubnetResourceId string = contains(map(subnets, subnet => subnet.name), 'backend')
+  ? virtualNetwork.outputs.subnetResourceIds[indexOf(map(subnets, subnet => subnet.name), 'backend')]
+  : ''
+output containerSubnetResourceId string = contains(map(subnets, subnet => subnet.name), 'containers')
+  ? virtualNetwork.outputs.subnetResourceIds[indexOf(map(subnets, subnet => subnet.name), 'containers')]
+  : ''
+output webserverfarmSubnetResourceId string = contains(map(subnets, subnet => subnet.name), 'webserverfarm')
+  ? virtualNetwork.outputs.subnetResourceIds[indexOf(map(subnets, subnet => subnet.name), 'webserverfarm')]
+  : ''
+output administrationSubnetResourceId string = contains(map(subnets, subnet => subnet.name), 'administration')
+  ? virtualNetwork.outputs.subnetResourceIds[indexOf(map(subnets, subnet => subnet.name), 'administration')]
+  : ''
+output bastionSubnetResourceId string = contains(map(subnets, subnet => subnet.name), 'AzureBastionSubnet')
+  ? virtualNetwork.outputs.subnetResourceIds[indexOf(map(subnets, subnet => subnet.name), 'AzureBastionSubnet')]
+  : ''
+
+// ============================================================================
+// Custom Types
+// ============================================================================
+@export()
+@description('Subnet output type')
+type subnetOutputType = {
+  @description('The name of the subnet.')
+  name: string
+  @description('The resource ID of the subnet.')
+  resourceId: string
+  @description('The name of the associated NSG, if any.')
+  nsgName: string?
+  @description('The resource ID of the associated NSG, if any.')
+  nsgResourceId: string?
+}
+
+@export()
+@description('Subnet configuration type')
+type subnetType = {
+  @description('Required. The name of the subnet.')
+  name: string
+  @description('Required. Address prefixes for the subnet.')
+  addressPrefixes: string[]
+  @description('Optional. Delegation for the subnet.')
+  delegation: string?
+  @description('Optional. Private endpoint network policies.')
+  privateEndpointNetworkPolicies: ('Disabled' | 'Enabled' | 'NetworkSecurityGroupEnabled' | 'RouteTableEnabled')?
+  @description('Optional. Private link service network policies.')
+  privateLinkServiceNetworkPolicies: ('Disabled' | 'Enabled')?
+  @description('Optional. NSG configuration for the subnet.')
+  networkSecurityGroup: networkSecurityGroupType?
+  @description('Optional. Route table resource ID.')
+  routeTableResourceId: string?
+  @description('Optional. Service endpoint policies.')
+  serviceEndpointPolicies: object[]?
+  @description('Optional. Service endpoints to enable.')
+  serviceEndpoints: string[]?
+  @description('Optional. Disable default outbound connectivity.')
+  defaultOutboundAccess: bool?
+}
+
+@export()
+@description('NSG configuration type')
+type networkSecurityGroupType = {
+  @description('Required. The name of the NSG.')
+  name: string
+  @description('Required. Security rules for the NSG.')
+  securityRules: object[]
+}

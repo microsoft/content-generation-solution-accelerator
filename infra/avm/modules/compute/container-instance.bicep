@@ -1,97 +1,96 @@
-// ========== container-instance.bicep ========== //
-// Azure Container Instance module for backend API deployment
+// ============================================================================
+// Module: Azure Container Instance (AVM)
+// AVM Module: avm/res/container-instance/container-group:0.7.0
+// ============================================================================
 
-@description('Required. Name of the container group.')
+@description('Name of the container group.')
 param name string
 
-@description('Required. Location for the container instance.')
+@description('Azure region for deployment.')
 param location string
 
-@description('Optional. Tags for all resources.')
+@description('Resource tags.')
 param tags object = {}
 
-@description('Required. Container image to deploy.')
+@description('Container image to deploy.')
 param containerImage string
 
-@description('Optional. CPU cores for the container.')
+@description('CPU cores for the container.')
 param cpu int = 2
 
-@description('Optional. Memory in GB for the container.')
+@description('Memory in GB for the container.')
 param memoryInGB int = 4
 
-@description('Optional. Port to expose.')
+@description('Port to expose.')
 param port int = 8000
 
-@description('Optional. Subnet resource ID for VNet integration. If empty, public IP will be used.')
+@description('Environment variables for the container.')
+param environmentVariables array = []
+
+@description('Operating system type.')
+@allowed(['Linux', 'Windows'])
+param osType string = 'Linux'
+
+@description('Restart policy.')
+@allowed(['Always', 'OnFailure', 'Never'])
+param restartPolicy string = 'Always'
+
+@description('Optional. Managed identities for the resource.')
+param managedIdentities object = { systemAssigned: true }
+
+@description('Image registry credentials.')
+param imageRegistryCredentials array = []
+
+@description('Subnet resource ID for VNet integration. If empty, public IP is used.')
 param subnetResourceId string = ''
 
-@description('Required. Environment variables for the container.')
-param environmentVariables array
+@description('Availability zone for the container group. Use -1 for no zone.')
+param availabilityZone int = -1
 
-@description('Optional. Enable telemetry.')
+@description('Enable Azure telemetry collection.')
 param enableTelemetry bool = true
 
-@description('Required. User-assigned managed identity resource ID for ACR pull.')
-param userAssignedIdentityResourceId string
-
+// ============================================================================
+// Variables
+// ============================================================================
 var isPrivateNetworking = !empty(subnetResourceId)
 
-// ============== //
-// Resources      //
-// ============== //
-
-#disable-next-line no-deployments-resources
-resource avmTelemetry 'Microsoft.Resources/deployments@2025-04-01' = if (enableTelemetry) {
-  name: '46d3xbcp.res.containerinstance.${replace('-..--..-', '.', '-')}.${substring(uniqueString(deployment().name, location), 0, 4)}'
-  properties: {
-    mode: 'Incremental'
-    template: {
-      '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
-      contentVersion: '1.0.0.0'
-      resources: []
-    }
-  }
-}
-
-resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2025-09-01' = {
-  name: name
-  location: location
-  tags: tags
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${userAssignedIdentityResourceId}': {}
-    }
-  }
-  properties: {
-    containers: [
-      {
-        name: name
-        properties: {
-          image: containerImage
-          resources: {
-            requests: {
-              cpu: cpu
-              memoryInGB: memoryInGB
-            }
-          }
-          ports: [
-            {
-              port: port
-              protocol: 'TCP'
-            }
-          ]
-          environmentVariables: environmentVariables
+var containers = [
+  {
+    name: name
+    properties: {
+      image: containerImage
+      resources: {
+        requests: {
+          cpu: cpu
+          memoryInGB: string(memoryInGB)
         }
       }
-    ]
-    osType: 'Linux'
-    restartPolicy: 'Always'
-    subnetIds: isPrivateNetworking ? [
-      {
-        id: subnetResourceId
-      }
-    ] : null
+      ports: [
+        {
+          port: port
+          protocol: 'TCP'
+        }
+      ]
+      environmentVariables: environmentVariables
+    }
+  }
+]
+
+// ============================================================================
+// Container Instance (AVM)
+// ============================================================================
+module containerGroup 'br/public:avm/res/container-instance/container-group:0.7.0' = {
+  name: take('avm.res.containerinstance.${name}', 64)
+  params: {
+    name: name
+    location: location
+    tags: tags
+    enableTelemetry: enableTelemetry
+    containers: containers
+    osType: osType
+    restartPolicy: restartPolicy
+    managedIdentities: managedIdentities
     ipAddress: {
       type: isPrivateNetworking ? 'Private' : 'Public'
       ports: [
@@ -102,23 +101,20 @@ resource containerGroup 'Microsoft.ContainerInstance/containerGroups@2025-09-01'
       ]
       dnsNameLabel: isPrivateNetworking ? null : name
     }
-    // Removed imageRegistryCredentials - ACR is public with anonymous pull enabled
-    // If you need managed identity auth, add AcrPull role to the managed identity on the ACR
+    imageRegistryCredentials: !empty(imageRegistryCredentials) ? imageRegistryCredentials : []
+    subnets: isPrivateNetworking ? [{ subnetResourceId: subnetResourceId }] : []
+    availabilityZone: availabilityZone
   }
 }
 
-// ============== //
-// Outputs        //
-// ============== //
-
+// ============================================================================
+// Outputs
+// ============================================================================
 @description('The name of the container group.')
-output name string = containerGroup.name
+output name string = containerGroup.outputs.name
 
 @description('The resource ID of the container group.')
-output resourceId string = containerGroup.id
+output resourceId string = containerGroup.outputs.resourceId
 
-@description('The IP address of the container (private or public depending on mode).')
-output ipAddress string = containerGroup.properties.ipAddress.ip
-
-@description('The FQDN of the container (only available for public mode).')
-output fqdn string = isPrivateNetworking ? '' : containerGroup.properties.ipAddress.fqdn
+@description('The IP address of the container group.')
+output ipAddress string = containerGroup.outputs.?iPv4Address ?? ''

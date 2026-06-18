@@ -1,47 +1,46 @@
 // ============================================================================
-// Module: Cosmos DB (NoSQL)
-// Description: Vanilla Bicep module for an Azure Cosmos DB account (SQL/NoSQL API)
-//              used for conversation history and product metadata.
-// Resource: Microsoft.DocumentDB/databaseAccounts@2024-11-15
+// Module: Cosmos DB
+// Description: Creates an Azure Cosmos DB (NoSQL) account with database/container
+// API: Microsoft.DocumentDB/databaseAccounts@2025-10-15
 // ============================================================================
 
-@description('Required. Name of the Cosmos DB account.')
-param name string
+@description('Solution name suffix used to derive the resource name.')
+param solutionName string
 
-@description('Required. Azure region for the resource.')
+@description('Name of the Cosmos DB account.')
+param name string = 'cosmos-${solutionName}'
+
+@description('Azure region for the resource.')
 param location string
 
-@description('Optional. Tags to apply to the resource.')
+@description('Tags to apply to the resource.')
 param tags object = {}
 
-@description('Optional. Enable/Disable usage telemetry for module.')
-#disable-next-line no-unused-params
-param enableTelemetry bool = true
+@description('Database name.')
+param databaseName string = 'db_conversation_history'
 
-@description('Required. Name of the SQL database.')
-param databaseName string
+@description('Container definitions.')
+param containers array = [
+  {
+    name: 'conversations'
+    partitionKeyPath: '/userId'
+  }
+]
 
-@description('Required. Containers to create in the SQL database. Each item: { name, paths }.')
-param containers array
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
 
-@description('Required. Principal ID of the managed identity to grant data contributor.')
-param principalId string
-
-@description('Required. Principal ID of the deploying user/service principal.')
-param deployerPrincipalId string
-
-var cosmosDataContributorRoleId = '00000000-0000-0000-0000-000000000002' // Built-in Cosmos DB Data Contributor
-
-resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
+// ============================================================================
+// Resource Deployment
+// ============================================================================
+resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2025-10-15' = {
   name: name
   location: location
   tags: tags
   kind: 'GlobalDocumentDB'
+  identity: identity
   properties: {
-    databaseAccountOfferType: 'Standard'
-    consistencyPolicy: {
-      defaultConsistencyLevel: 'Session'
-    }
+    consistencyPolicy: { defaultConsistencyLevel: 'Session' }
     locations: [
       {
         locationName: location
@@ -49,86 +48,47 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
         isZoneRedundant: false
       }
     ]
+    databaseAccountOfferType: 'Standard'
     enableAutomaticFailover: false
-    capabilities: [
-      {
-        name: 'EnableServerless'
-      }
-    ]
-    publicNetworkAccess: 'Enabled'
-    networkAclBypass: 'AzureServices'
+    enableMultipleWriteLocations: false
+    disableLocalAuth: true
+    capabilities: [ { name: 'EnableServerless' } ]
   }
 }
 
-resource sqlDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15' = {
+resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2025-10-15' = {
   parent: cosmos
   name: databaseName
   properties: {
-    resource: {
-      id: databaseName
-    }
+    resource: { id: databaseName }
   }
-}
 
-resource sqlContainers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = [
-  for container in containers: {
-    parent: sqlDatabase
+  resource list 'containers' = [for container in containers: {
     name: container.name
     properties: {
       resource: {
         id: container.name
-        partitionKey: {
-          paths: container.paths
-          kind: 'Hash'
-        }
+        partitionKey: { paths: [ container.partitionKeyPath ] }
       }
+      options: {}
     }
-  }
-]
-
-resource dataContributorRoleDefinition 'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions@2024-11-15' = {
-  parent: cosmos
-  name: guid(cosmos.id, 'contentgen-data-contributor')
-  properties: {
-    roleName: 'contentgen-data-contributor'
-    type: 'CustomRole'
-    assignableScopes: [
-      cosmos.id
-    ]
-    permissions: [
-      {
-        dataActions: [
-          'Microsoft.DocumentDB/databaseAccounts/readMetadata'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*'
-          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*'
-        ]
-      }
-    ]
-  }
+  }]
 }
 
-resource identityRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-11-15' = {
-  parent: cosmos
-  name: guid(cosmos.id, principalId, cosmosDataContributorRoleId)
-  properties: {
-    roleDefinitionId: '${cosmos.id}/sqlRoleDefinitions/${cosmosDataContributorRoleId}'
-    principalId: principalId
-    scope: cosmos.id
-  }
-}
-
-resource deployerRoleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-11-15' = {
-  parent: cosmos
-  name: guid(cosmos.id, deployerPrincipalId, cosmosDataContributorRoleId)
-  properties: {
-    roleDefinitionId: '${cosmos.id}/sqlRoleDefinitions/${cosmosDataContributorRoleId}'
-    principalId: deployerPrincipalId
-    scope: cosmos.id
-  }
-}
-
+// ============================================================================
+// Outputs
+// ============================================================================
 @description('Resource ID of the Cosmos DB account.')
 output resourceId string = cosmos.id
 
 @description('Name of the Cosmos DB account.')
 output name string = cosmos.name
+
+@description('Endpoint of the Cosmos DB account.')
+output endpoint string = 'https://${name}.documents.azure.com:443/'
+
+@description('Database name.')
+output databaseName string = databaseName
+
+@description('Container name (first container).')
+output containerName string = containers[0].name

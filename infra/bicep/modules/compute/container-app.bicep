@@ -41,8 +41,8 @@ param registries array?
 @description('Secret definitions.')
 param secrets array?
 
-@description('Managed identity configuration.')
-param managedIdentities object = {}
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
 
 @description('CORS policy configuration.')
 param corsPolicy object = {}
@@ -62,12 +62,7 @@ param workloadProfileName string?
 
 // ============================================================================
 // Resource Deployment
-// ============================================================================
-var identityConfig = empty(managedIdentities) ? { type: 'None' } : {
-  type: contains(managedIdentities, 'userAssignedResourceIds') ? (contains(managedIdentities, 'systemAssigned') && managedIdentities.systemAssigned ? 'SystemAssigned,UserAssigned' : 'UserAssigned') : 'SystemAssigned'
-  userAssignedIdentities: contains(managedIdentities, 'userAssignedResourceIds') ? reduce(managedIdentities.userAssignedResourceIds, {}, (cur, id) => union(cur, { '${id}': {} })) : null
-}
-
+// ===========================================================================
 var ingressConfig = disableIngress ? null : {
   external: ingressExternal
   targetPort: ingressTargetPort
@@ -80,7 +75,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-10-02-preview' = {
   name: name
   location: location
   tags: tags
-  identity: identityConfig
+  identity: identity
   properties: {
     managedEnvironmentId: environmentResourceId
     workloadProfileName: workloadProfileName

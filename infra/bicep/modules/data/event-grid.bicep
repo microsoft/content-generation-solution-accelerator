@@ -25,8 +25,8 @@ param topicType string
 @description('Event subscriptions to create on the system topic.')
 param eventSubscriptions array = []
 
-@description('Managed identities configuration. E.g., { systemAssigned: false, userAssignedResourceIds: [] }.')
-param managedIdentities object = {}
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
 
 // ============================================================================
 // Resource
@@ -35,14 +35,7 @@ resource eventGridSystemTopic 'Microsoft.EventGrid/systemTopics@2025-07-15-previ
   name: name
   location: location
   tags: tags
-  identity: !empty(managedIdentities) ? {
-    type: (managedIdentities.?systemAssigned ?? false) && !empty(managedIdentities.?userAssignedResourceIds ?? [])
-      ? 'SystemAssigned,UserAssigned'
-      : (managedIdentities.?systemAssigned ?? false) ? 'SystemAssigned' : 'UserAssigned'
-    userAssignedIdentities: !empty(managedIdentities.?userAssignedResourceIds ?? [])
-      ? reduce(managedIdentities.userAssignedResourceIds, {}, (cur, next) => union(cur, { '${next}': {} }))
-      : null
-  } : null
+  identity: identity
   properties: {
     source: source
     topicType: topicType
@@ -78,4 +71,4 @@ output name string = eventGridSystemTopic.name
 output resourceId string = eventGridSystemTopic.id
 
 @description('System-assigned principal ID (if enabled).')
-output systemAssignedMIPrincipalId string = (managedIdentities.?systemAssigned ?? false) ? eventGridSystemTopic.identity.principalId : ''
+output systemAssignedMIPrincipalId string = (identity.?systemAssigned ?? false) ? eventGridSystemTopic.identity.principalId : ''

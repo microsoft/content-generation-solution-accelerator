@@ -151,7 +151,6 @@ hooks:
           az deployment group create `
             --resource-group $resourceGroup `
             --template-file ./infra/main.bicep `
-            --parameters deploymentFlavor=bicep `
             --parameters solutionName=$env:AZURE_ENV_NAME `
             --parameters location=$env:AZURE_LOCATION `
             --parameters azureAiServiceLocation=$env:AZURE_ENV_AI_SERVICE_LOCATION `
@@ -219,7 +218,6 @@ hooks:
           if az deployment group create \
             --resource-group "$RESOURCE_GROUP" \
             --template-file ./infra/main.bicep \
-            --parameters deploymentFlavor=bicep \
             --parameters solutionName="$AZURE_ENV_NAME" \
             --parameters location="$AZURE_LOCATION" \
             --parameters azureAiServiceLocation="$AZURE_ENV_AI_SERVICE_LOCATION" \

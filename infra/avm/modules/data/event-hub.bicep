@@ -26,8 +26,8 @@ param sku object = {
 @description('Event hubs to create within the namespace.')
 param eventhubs array = []
 
-@description('Managed identity configuration.')
-param managedIdentities object = {}
+@description('Optional. Managed identities for the resource.')
+param managedIdentities object = { systemAssigned: true }
 
 @description('Role assignments.')
 param roleAssignments array = []
@@ -75,7 +75,7 @@ module eventHubNamespace 'br/public:avm/res/event-hub/namespace:0.14.1' = {
     skuName: sku.name
     skuCapacity: sku.capacity
     eventhubs: eventHubItems
-    managedIdentities: !empty(managedIdentities) ? managedIdentities : {}
+    managedIdentities: managedIdentities
     roleAssignments: !empty(roleAssignments) ? roleAssignments : []
     privateEndpoints: privateEndpointConfig
   }

@@ -22,6 +22,9 @@ param logAnalyticsWorkspaceResourceId string
 @description('Enable zone redundancy.')
 param zoneRedundant bool = false
 
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
+
 @description('Workload profiles configuration (e.g., Consumption or dedicated D4 profiles).')
 param workloadProfiles array = [
   {
@@ -33,10 +36,11 @@ param workloadProfiles array = [
 // ============================================================================
 // Resource Deployment
 // ============================================================================
-resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
+resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2026-01-01' = {
   name: name
   location: location
   tags: tags
+  identity: identity
   properties: {
     appLogsConfiguration: {
       destination: 'log-analytics'

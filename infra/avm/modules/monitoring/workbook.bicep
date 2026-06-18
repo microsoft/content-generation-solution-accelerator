@@ -29,6 +29,9 @@ param sourceId string = 'azure monitor'
 @description('Gallery category for the workbook. E.g., workbook, tsg.')
 param category string = 'workbook'
 
+@description('Optional. Managed identities for the resource.')
+param identity object = { systemAssigned: true }
+
 // ============================================================================
 // Resource
 // ============================================================================
@@ -44,6 +47,7 @@ resource workbook 'Microsoft.Insights/workbooks@2023-06-01' = {
     sourceId: sourceId
     category: category
   }
+  identity: identity
 }
 
 // ============================================================================

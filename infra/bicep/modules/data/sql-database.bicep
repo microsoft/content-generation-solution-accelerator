@@ -40,6 +40,9 @@ param autoPauseDelay int = 60
 @description('Minimum capacity (vCores).')
 param minCapacity int = 1
 
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
+
 // ============================================================================
 // Resource Deployment
 // ============================================================================
@@ -47,6 +50,7 @@ resource sqlServer 'Microsoft.Sql/servers@2025-01-01' = {
   name: name
   location: location
   tags: tags
+  identity: identity
   properties: {
     publicNetworkAccess: 'Enabled'
     version: '12.0'

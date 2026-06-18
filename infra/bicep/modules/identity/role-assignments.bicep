@@ -301,3 +301,4 @@ resource deployerStorageBlobContributor 'Microsoft.Authorization/roleAssignments
 
 // NOTE: Deployer roles on existing AI Foundry (cross-scope) are assigned via
 // 00_build_solution.py to avoid conflicts when the deployer already has the roles.
+ 

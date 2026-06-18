@@ -40,8 +40,8 @@ param registries array?
 @description('Secret definitions.')
 param secrets array?
 
-@description('Managed identity configuration.')
-param managedIdentities object = {}
+@description('Optional. Managed identities for the resource.')
+param managedIdentities object = { systemAssigned: true }
 
 @description('CORS policy configuration.')
 param corsPolicy object = {}
@@ -81,7 +81,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.22.1' = {
     disableIngress: disableIngress
     registries: registries
     secrets: secrets
-    managedIdentities: !empty(managedIdentities) ? managedIdentities : {}
+    managedIdentities: managedIdentities
     corsPolicy: !empty(corsPolicy) ? corsPolicy : null
     activeRevisionsMode: activeRevisionsMode
     scaleSettings: scaleSettings

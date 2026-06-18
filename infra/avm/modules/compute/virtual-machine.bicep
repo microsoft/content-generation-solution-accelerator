@@ -1,108 +1,160 @@
 // ============================================================================
 // Module: Virtual Machine (Jumpbox)
-// Description: AVM wrapper for a Windows jumpbox VM used for private network
-//              administration via Azure Bastion.
-// AVM Module: avm/res/compute/virtual-machine:0.21.0
+// Description: AVM wrapper for Azure Virtual Machine with Entra ID authentication
+// AVM Module: avm/res/compute/virtual-machine
+// Ref: https://learn.microsoft.com/azure/bastion/bastion-entra-id-authentication
 // ============================================================================
 
-@description('Required. Name of the virtual machine (max 15 chars).')
-param name string
+@description('Solution name suffix used to derive the resource name.')
+param solutionName string
 
-@description('Required. Azure region for the resource.')
+@description('Name of the virtual machine.')
+param name string = 'vm-${solutionName}'
+
+@description('Azure region for the resource.')
 param location string
 
-@description('Optional. Tags to apply to the resource.')
+@description('Tags to apply to the resource.')
 param tags object = {}
 
-@description('Optional. Enable/Disable usage telemetry for module.')
-param enableTelemetry bool = true
-
-@description('Optional. VM size.')
+@description('VM size.')
 param vmSize string = 'Standard_D2s_v5'
 
-@description('Required. Admin username for the VM.')
+@secure()
+@description('Local admin username. Required by Azure at provisioning time but not used for login when Entra ID is enabled.')
 param adminUsername string
 
 @secure()
-@description('Required. Admin password for the VM.')
+@description('Local admin password. Required by Azure at provisioning time but not used for login when Entra ID is enabled.')
 param adminPassword string
 
-@description('Required. Resource ID of the user assigned managed identity.')
-param userAssignedIdentityResourceId string
-
-@description('Required. Resource ID of the subnet to attach the NIC to.')
+@description('Resource ID of the subnet for the VM NIC.')
 param subnetResourceId string
 
-@description('Optional. Availability zone (-1 to disable).')
-param availabilityZone int = -1
+@description('OS type for the VM.')
+param osType string = 'Windows'
 
-@description('Optional. Enable monitoring agent and DCR association.')
-param enableMonitoring bool = false
+@description('Availability zone for the VM.')
+param availabilityZone int = 1
 
-@description('Optional. Resource ID of the Data Collection Rule to associate.')
-param dataCollectionRuleResourceId string = ''
+@description('Image reference for the VM.')
+param imageReference object = {
+  publisher: 'microsoft-dsvm'
+  offer: 'dsvm-win-2022'
+  sku: 'winserver-2022'
+  version: 'latest'
+}
 
-module vm 'br/public:avm/res/compute/virtual-machine:0.21.0' = {
+@description('OS disk size in GB.')
+param osDiskSizeGB int = 128
+
+@description('Resource ID of the maintenance configuration.')
+param maintenanceConfigurationResourceId string?
+
+@description('Resource ID of the proximity placement group.')
+param proximityPlacementGroupResourceId string?
+
+@description('Monitoring agent extension configuration (data collection rule associations).')
+param extensionMonitoringAgentConfig object?
+
+@description('Diagnostic settings for the resource.')
+param diagnosticSettings array?
+
+@description('Enable Azure telemetry collection.')
+param enableTelemetry bool = true
+
+@description('Deploying user principal ID. Used for default role assignment to grant the deploying user login access to the VM. This is required because with Entra ID authentication enabled, local accounts cannot be used to access the VM, including the local admin account created at provisioning.')
+param deployingUserPrincipalId string
+
+@description('Deploying user principal type. Used for default role assignment to grant the deploying user login access to the VM. This is required because with Entra ID authentication enabled, local accounts cannot be used to access the VM, including the local admin account created at provisioning.')
+param deployingUserPrincipalType string = 'User'
+
+@description('Role assignments to apply to the virtual machine.')
+param roleAssignments array = [
+  {
+    roleDefinitionIdOrName: '1c0163c0-47e6-4577-8991-ea5c82e286e4' // Virtual Machine Administrator Login
+    principalId: deployingUserPrincipalId
+    principalType: deployingUserPrincipalType
+  }
+]
+
+@description('Optional. Managed identities for the resource.')
+param managedIdentities object = { systemAssigned: true }
+
+// ============================================================================
+// AVM Module Deployment
+// ============================================================================
+module virtualMachine 'br/public:avm/res/compute/virtual-machine:0.22.0' = {
   name: take('avm.res.compute.virtual-machine.${name}', 64)
   params: {
-    name: take(name, 15)
+    name: name
+    location: location
+    tags: tags
     enableTelemetry: enableTelemetry
     computerName: take(name, 15)
-    osType: 'Windows'
+    osType: osType
     vmSize: vmSize
     adminUsername: adminUsername
     adminPassword: adminPassword
-    managedIdentities: {
-      userAssignedResourceIds: [
-        userAssignedIdentityResourceId
-      ]
-    }
+    managedIdentities: managedIdentities
+    patchMode: 'AutomaticByPlatform'
+    bypassPlatformSafetyChecksOnUserSchedule: true
+    maintenanceConfigurationResourceId: maintenanceConfigurationResourceId
+    enableAutomaticUpdates: true
+    encryptionAtHost: true
     availabilityZone: availabilityZone
-    imageReference: {
-      publisher: 'microsoft-dsvm'
-      offer: 'dsvm-win-2022'
-      sku: 'winserver-2022'
-      version: 'latest'
+    proximityPlacementGroupResourceId: proximityPlacementGroupResourceId
+    imageReference: imageReference
+    osDisk: {
+      name: 'osdisk-${name}'
+      caching: 'ReadWrite'
+      createOption: 'FromImage'
+      deleteOption: 'Delete'
+      diskSizeGB: osDiskSizeGB
+      managedDisk: { storageAccountType: 'Premium_LRS' }
     }
     nicConfigurations: [
       {
         name: 'nic-${name}'
-        enableAcceleratedNetworking: true
+        tags: tags
+        deleteOption: 'Delete'
+        diagnosticSettings: diagnosticSettings
         ipConfigurations: [
           {
-            name: 'ipconfig01'
+            name: '${name}-nic01-ipconfig01'
             subnetResourceId: subnetResourceId
+            diagnosticSettings: diagnosticSettings
           }
         ]
       }
     ]
-    osDisk: {
-      caching: 'ReadWrite'
-      diskSizeGB: 128
-      managedDisk: {
-        storageAccountType: 'Premium_LRS'
+    roleAssignments: roleAssignments
+    extensionAadJoinConfig: {
+      enabled: true
+      tags: tags
+      typeHandlerVersion: '2.0'
+      settings: { mdmId: '' }
+    }
+    extensionAntiMalwareConfig: {
+      enabled: true
+      settings: {
+        AntimalwareEnabled: 'true'
+        Exclusions: {}
+        RealtimeProtectionEnabled: 'true'
+        ScheduledScanSettings: { day: '7', isEnabled: 'true', scanType: 'Quick', time: '120' }
       }
+      tags: tags
     }
-    encryptionAtHost: false // Some Azure subscriptions do not support encryption at host
-    extensionMonitoringAgentConfig: {
-      enabled: enableMonitoring
-      dataCollectionRuleAssociations: enableMonitoring && !empty(dataCollectionRuleResourceId)
-        ? [
-            {
-              name: 'dcra-${name}'
-              dataCollectionRuleResourceId: dataCollectionRuleResourceId
-              description: 'Associates the Windows security event DCR with the jumpbox VM.'
-            }
-          ]
-        : []
-    }
-    location: location
-    tags: tags
+    extensionMonitoringAgentConfig: extensionMonitoringAgentConfig
+    extensionNetworkWatcherAgentConfig: { enabled: true, tags: tags }
   }
 }
 
+// ============================================================================
+// Outputs
+// ============================================================================
 @description('Resource ID of the virtual machine.')
-output resourceId string = vm.outputs.resourceId
+output resourceId string = virtualMachine.outputs.resourceId
 
 @description('Name of the virtual machine.')
-output name string = vm.outputs.name
+output name string = virtualMachine.outputs.name

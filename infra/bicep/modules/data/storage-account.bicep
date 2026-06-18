@@ -1,52 +1,71 @@
 // ============================================================================
 // Module: Storage Account
-// Description: Vanilla Bicep module for an Azure Storage Account (blob) used for
-//              product and generated image storage.
-// Resource: Microsoft.Storage/storageAccounts@2024-01-01
+// Description: Creates an Azure Storage Account with blob container
+// API: Microsoft.Storage/storageAccounts@2025-08-01
 // ============================================================================
 
-@description('Required. Name of the storage account.')
-param name string
+@description('Solution name suffix used to derive the resource name.')
+param solutionName string
 
-@description('Required. Azure region for the resource.')
+@description('Name of the storage account.')
+param name string = take('st${toLower(replace(solutionName, '-', ''))}', 24)
+
+@description('Azure region for the resource.')
 param location string
 
-@description('Optional. Tags to apply to the resource.')
+@description('Tags to apply to the resource.')
 param tags object = {}
 
-@description('Optional. Enable/Disable usage telemetry for module.')
-#disable-next-line no-unused-params
-param enableTelemetry bool = true
-
-@description('Optional. Storage account SKU.')
+@description('Storage account SKU.')
 param skuName string = 'Standard_LRS'
 
-@description('Required. Blob containers to create. Each item: { name, publicAccess }.')
-param containers array
+@description('Storage account kind.')
+param kind string = 'StorageV2'
 
-@description('Required. Principal ID of the managed identity to grant Storage Blob Data Contributor.')
-param principalId string
+@description('Access tier.')
+@allowed(['Hot', 'Cool'])
+param accessTier string = 'Hot'
 
-resource storageAccount 'Microsoft.Storage/storageAccounts@2024-01-01' = {
+@description('Allow blob public access.')
+param allowBlobPublicAccess bool = false
+
+@description('Allow shared key access.')
+param allowSharedKeyAccess bool = true
+
+@description('Enable hierarchical namespace (Data Lake Storage Gen2).')
+param enableHierarchicalNamespace bool = false
+
+@description('Blob containers to create.')
+param containers array = [
+  {
+    name: 'default'
+    publicAccess: 'None'
+  }
+]
+
+@description('Optional. Managed identity configuration for the resource.')
+param identity object = { type: 'SystemAssigned' }
+
+// ============================================================================
+// Resource Deployment
+// ============================================================================
+resource storageAccount 'Microsoft.Storage/storageAccounts@2025-08-01' = {
   name: name
   location: location
   tags: tags
-  kind: 'StorageV2'
+  kind: kind
   sku: {
     name: skuName
   }
-  identity: {
-    type: 'SystemAssigned'
-  }
+  identity: identity
   properties: {
-    accessTier: 'Hot'
+    accessTier: accessTier
+    allowBlobPublicAccess: allowBlobPublicAccess
+    allowSharedKeyAccess: allowSharedKeyAccess
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
-    allowBlobPublicAccess: false
-    publicNetworkAccess: 'Enabled'
+    isHnsEnabled: enableHierarchicalNamespace
     encryption: {
-      requireInfrastructureEncryption: true
-      keySource: 'Microsoft.Storage'
       services: {
         blob: {
           enabled: true
@@ -55,52 +74,36 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2024-01-01' = {
           enabled: true
         }
       }
-    }
-    networkAcls: {
-      bypass: 'AzureServices'
-      defaultAction: 'Allow'
+      keySource: 'Microsoft.Storage'
+      requireInfrastructureEncryption: true
     }
   }
 }
 
-resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2024-01-01' = {
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2025-08-01' = {
   parent: storageAccount
   name: 'default'
-  properties: {
-    containerDeleteRetentionPolicy: {
-      enabled: true
-      days: 7
-    }
-    deleteRetentionPolicy: {
-      enabled: true
-      days: 7
-    }
-  }
 }
 
-resource blobContainers 'Microsoft.Storage/storageAccounts/blobServices/containers@2024-01-01' = [
-  for container in containers: {
-    parent: blobServices
-    name: container.name
-    properties: {
-      publicAccess: container.?publicAccess ?? 'None'
-    }
-  }
-]
-
-// Storage Blob Data Contributor role assignment for the managed identity.
-resource blobDataContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, principalId, 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
-  scope: storageAccount
+resource blobContainers 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-08-01' = [for container in containers: {
+  parent: blobService
+  name: container.name
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe') // Storage Blob Data Contributor
-    principalId: principalId
-    principalType: 'ServicePrincipal'
+    publicAccess: container.publicAccess
   }
-}
+}]
 
-@description('Resource ID of the storage account.')
+// ============================================================================
+// Outputs
+// ============================================================================
+@description('Resource ID of the Storage Account.')
 output resourceId string = storageAccount.id
 
-@description('Name of the storage account.')
+@description('Name of the Storage Account.')
 output name string = storageAccount.name
+
+@description('Primary blob endpoint.')
+output blobEndpoint string = storageAccount.properties.primaryEndpoints.blob
+
+@description('All service endpoints.')
+output serviceEndpoints object = storageAccount.properties.primaryEndpoints
