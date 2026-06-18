@@ -113,7 +113,7 @@ param useFoundryMode bool = true
 
 @description('Optional. Unused in the Docker (bicep) flavor; a dedicated Container Registry is created during deployment. Retained for parameter-file compatibility.')
 #disable-next-line no-unused-params
-param acrName string = 'contentgencontainerreg'
+param acrName string = ''
 
 @description('Optional. Frontend image name (built and pushed by AZD).')
 param frontendImageName string = 'content-gen-app'
@@ -122,7 +122,7 @@ param frontendImageName string = 'content-gen-app'
 param backendImageName string = 'content-gen-api'
 
 @description('Optional. Image tag. ACI is only deployed when a real tag (not empty / not "none") is provided.')
-param imageTag string = 'latest'
+param imageTag string = ''
 
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
@@ -270,7 +270,7 @@ resource resourceGroupTags 'Microsoft.Resources/tags@2025-04-01' = {
 
 // ========== Log Analytics Workspace ========== //
 var logAnalyticsWorkspaceResourceName = 'log-${solutionSuffix}'
-module logAnalyticsWorkspace 'modules/monitoring/log-analytics.bicep' = if (!useExistingLogAnalytics) {
+module logAnalyticsWorkspace './bicep/modules/monitoring/log-analytics.bicep' = if (!useExistingLogAnalytics) {
   name: take('module.monitoring.log-analytics.${logAnalyticsWorkspaceResourceName}', 64)
   params: {
     name: logAnalyticsWorkspaceResourceName
@@ -285,7 +285,7 @@ var logAnalyticsWorkspaceResourceId = useExistingLogAnalytics
 
 // ========== Application Insights ========== //
 var applicationInsightsResourceName = 'appi-${solutionSuffix}'
-module applicationInsights 'modules/monitoring/app-insights.bicep' = {
+module applicationInsights './bicep/modules/monitoring/app-insights.bicep' = {
   name: take('module.monitoring.app-insights.${applicationInsightsResourceName}', 64)
   params: {
     name: applicationInsightsResourceName
@@ -298,7 +298,7 @@ module applicationInsights 'modules/monitoring/app-insights.bicep' = {
 
 // ========== User Assigned Identity ========== //
 var userAssignedIdentityResourceName = 'id-${solutionSuffix}'
-module userAssignedIdentity 'modules/identity/user-assigned-identity.bicep' = {
+module userAssignedIdentity './bicep/modules/identity/user-assigned-identity.bicep' = {
   name: take('module.identity.user-assigned-identity.${userAssignedIdentityResourceName}', 64)
   params: {
     name: userAssignedIdentityResourceName
@@ -308,9 +308,21 @@ module userAssignedIdentity 'modules/identity/user-assigned-identity.bicep' = {
   }
 }
 
+// ========== Azure Container Registry ========== //
+// Docker (bicep) flavor: ACR for remote Docker builds (AZD pushes images here).
+module containerRegistry './bicep/modules/compute/container-registry.bicep' = {
+  name: take('module.compute.container-registry.${acrResourceName}', 64)
+  params: {
+    name: acrResourceName
+    location: solutionLocation
+    tags: tags
+    enableTelemetry: enableTelemetry
+    principalId: userAssignedIdentity.outputs.principalId
+  }
+}
 
 // ========== AI Foundry: AI Services ========== //
-module aiFoundryAiServices 'modules/ai/ai-foundry-services.bicep'  = if (!useExistingAiFoundryAiProject) {
+module aiFoundryAiServices './bicep/modules/ai/ai-foundry-services.bicep'  = if (!useExistingAiFoundryAiProject) {
   name: take('module.ai.ai-foundry-services.${aiFoundryAiServicesResourceName}', 64)
   params: {
     name: aiFoundryAiServicesResourceName
@@ -324,7 +336,7 @@ module aiFoundryAiServices 'modules/ai/ai-foundry-services.bicep'  = if (!useExi
   }
 }
 
-module aiFoundryAiServicesProject 'modules/ai/ai-foundry-project.bicep' = if (!useExistingAiFoundryAiProject) {
+module aiFoundryAiServicesProject './bicep/modules/ai/ai-foundry-project.bicep' = if (!useExistingAiFoundryAiProject) {
   name: take('module.ai-project.${aiFoundryAiProjectResourceName}', 64)
   params: {
     name: aiFoundryAiProjectResourceName
@@ -344,7 +356,7 @@ var aiFoundryAiProjectEndpoint = useExistingAiFoundryAiProject
   : aiFoundryAiServicesProject!.outputs.apiEndpoint
 
 // ========== Role Assignments for Existing AI Services ========== //
-module existingAiServicesRoleAssignments 'modules/ai/existing-services-roles.bicep' = if (useExistingAiFoundryAiProject) {
+module existingAiServicesRoleAssignments './bicep/modules/ai/existing-services-roles.bicep' = if (useExistingAiFoundryAiProject) {
   name: take('module.foundry-role-assignment.${aiFoundryAiServicesResourceName}', 64)
   scope: resourceGroup(aiFoundryAiServicesSubscriptionId, aiFoundryAiServicesResourceGroupName)
   params: {
@@ -355,7 +367,7 @@ module existingAiServicesRoleAssignments 'modules/ai/existing-services-roles.bic
 }
 
 // ========== Model Deployments for Existing AI Services ========== //
-module existingAiServicesModelDeployments 'modules/ai/ai-foundry-model-deployment.bicep' = if (useExistingAiFoundryAiProject) {
+module existingAiServicesModelDeployments './bicep/modules/ai/ai-foundry-model-deployment.bicep' = if (useExistingAiFoundryAiProject) {
   name: take('module.model-deployments-existing.${aiFoundryAiServicesResourceName}', 64)
   scope: resourceGroup(aiFoundryAiServicesSubscriptionId, aiFoundryAiServicesResourceGroupName)
   params: {
@@ -380,7 +392,7 @@ module existingAiServicesModelDeployments 'modules/ai/ai-foundry-model-deploymen
 }
 
 // ========== AI Search ========== //
-module aiSearch 'modules/ai/ai-search.bicep' = {
+module aiSearch './bicep/modules/ai/ai-search.bicep' = {
   name: take('module.ai.ai-search.${aiSearchName}', 64)
   params: {
     name: aiSearchName
@@ -398,7 +410,7 @@ var storageAccountName = 'st${solutionSuffix}'
 var productImagesContainer = 'product-images'
 var generatedImagesContainer = 'generated-images'
 
-module storageAccount 'modules/data/storage-account.bicep' = {
+module storageAccount './bicep/modules/data/storage-account.bicep' = {
   name: take('module.data.storage-account.${storageAccountName}', 64)
   params: {
     name: storageAccountName
@@ -426,7 +438,7 @@ var cosmosDBDatabaseName = 'content_generation_db'
 var cosmosDBConversationsContainer = 'conversations'
 var cosmosDBProductsContainer = 'products'
 
-module cosmosDB 'modules/data/cosmos-db-nosql.bicep' = {
+module cosmosDB './bicep/modules/data/cosmos-db-nosql.bicep' = {
   name: take('module.data.cosmos-db-nosql.${cosmosDBResourceName}', 64)
   params: {
     name: 'cosmos-${solutionSuffix}'
@@ -455,7 +467,7 @@ module cosmosDB 'modules/data/cosmos-db-nosql.bicep' = {
 
 // ========== App Service Plan ========== //
 var webServerFarmResourceName = 'asp-${solutionSuffix}'
-module webServerFarm 'modules/compute/app-service-plan.bicep' = {
+module webServerFarm './bicep/modules/compute/app-service-plan.bicep' = {
   name: take('module.compute.app-service-plan.${webServerFarmResourceName}', 64)
   params: {
     name: webServerFarmResourceName
@@ -474,7 +486,7 @@ var webSiteResourceName = 'app-${solutionSuffix}'
 var aciBackendUrl = shouldDeployACI
   ? 'http://${containerInstance!.properties.ipAddress.fqdn}:8000'
   : ''
-module webSite 'modules/compute/app-service.bicep' = {
+module webSite './bicep/modules/compute/app-service.bicep' = {
   name: take('module.web-sites.${webSiteResourceName}', 64)
   params: {
     name: webSiteResourceName
@@ -485,7 +497,7 @@ module webSite 'modules/compute/app-service.bicep' = {
     managedIdentities: { userAssignedResourceIds: [userAssignedIdentity!.outputs.resourceId] }
     siteConfig: {
       // Node.js runtime for frontend server (code deployment via AZD)
-      linuxFxVersion: 'DOCKER|${acrName}.azurecr.io/${frontendImageName}:${imageTag}'
+      linuxFxVersion: 'NODE|22-lts'
       minTlsVersion: '1.2'
       alwaysOn: true
       ftpsState: 'FtpsOnly'
@@ -517,7 +529,7 @@ module webSite 'modules/compute/app-service.bicep' = {
 // ========== Container Instance (Backend API) ========== //
 // Docker (bicep) flavor: inline ACI definition with managed identity auth for the created ACR.
 var containerInstanceName = 'aci-${solutionSuffix}'
-var backendImageUrl = '${acrName}.azurecr.io/${backendImageName}:${imageTag}'
+var backendImageUrl = '${containerRegistry.outputs.loginServer}/${backendImageName}:${imageTag}'
 var aciPort = 8000
 // Construct identity resource ID from known values (required for deployment-time calculation)
 var userAssignedIdentityResourceIdForACI = '/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/${userAssignedIdentityResourceName}'
@@ -617,7 +629,13 @@ resource containerInstance 'Microsoft.ContainerInstance/containerGroups@2025-09-
       ]
       dnsNameLabel: containerInstanceName
     }
-
+    // Managed identity auth for ACR (instead of anonymous pull)
+    imageRegistryCredentials: [
+      {
+        server: containerRegistry.outputs.loginServer
+        identity: userAssignedIdentityResourceIdForACI
+      }
+    ]
   }
 }
 
@@ -704,7 +722,7 @@ output CONTAINER_INSTANCE_NAME string = shouldDeployACI ? containerInstance!.nam
 output CONTAINER_INSTANCE_FQDN string = shouldDeployACI ? containerInstance!.properties.ipAddress.fqdn : ''
 
 @description('Contains ACR Name')
-output AZURE_ENV_CONTAINER_REGISTRY_NAME string = acrName
+output AZURE_ENV_CONTAINER_REGISTRY_NAME string = containerRegistry.outputs.name
 
 @description('Contains flag for Azure AI Foundry usage')
 output USE_FOUNDRY bool = useFoundryMode ? true : false
@@ -729,5 +747,4 @@ output BACKEND_IMAGE_NAME string = backendImageName
 
 @description('Image tag')
 output AZURE_ENV_IMAGE_TAG string = imageTag
-
  

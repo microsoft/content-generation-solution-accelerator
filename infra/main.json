@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "6826618305183727166"
+      "templateHash": "2998765329568410352"
     },
     "name": "Intelligent Content Generation Accelerator",
     "description": "Solution Accelerator for multimodal marketing content generation using Microsoft Agent Framework.\n"
@@ -48128,7 +48128,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "16131208454470065599"
+              "templateHash": "362554338687086271"
             },
             "name": "Intelligent Content Generation Accelerator",
             "description": "Solution Accelerator for multimodal marketing content generation using Microsoft Agent Framework.\r\n"
@@ -48300,7 +48300,7 @@
             },
             "acrName": {
               "type": "string",
-              "defaultValue": "",
+              "defaultValue": "contentgencontainerreg",
               "metadata": {
                 "description": "Optional. Unused in the Docker (bicep) flavor; a dedicated Container Registry is created during deployment. Retained for parameter-file compatibility."
               }
@@ -48321,7 +48321,7 @@
             },
             "imageTag": {
               "type": "string",
-              "defaultValue": "",
+              "defaultValue": "latest",
               "metadata": {
                 "description": "Optional. Image tag. ACI is only deployed when a real tag (not empty / not \"none\") is provided."
               }
@@ -48399,6 +48399,7 @@
             "webServerFarmResourceName": "[format('asp-{0}', variables('solutionSuffix'))]",
             "webSiteResourceName": "[format('app-{0}', variables('solutionSuffix'))]",
             "containerInstanceName": "[format('aci-{0}', variables('solutionSuffix'))]",
+            "backendImageUrl": "[format('{0}.azurecr.io/{1}:{2}', parameters('acrName'), parameters('backendImageName'), parameters('imageTag'))]",
             "aciPort": 8000,
             "userAssignedIdentityResourceIdForACI": "[format('/subscriptions/{0}/resourceGroups/{1}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{2}', subscription().subscriptionId, resourceGroup().name, variables('userAssignedIdentityResourceName'))]",
             "shouldDeployACI": "[and(not(empty(parameters('imageTag'))), not(equals(parameters('imageTag'), 'none')))]"
@@ -48464,7 +48465,7 @@
                   {
                     "name": "[variables('containerInstanceName')]",
                     "properties": {
-                      "image": "[format('{0}/{1}:{2}', reference(resourceId('Microsoft.Resources/deployments', take(format('module.compute.container-registry.{0}', variables('acrResourceName')), 64)), '2025-04-01').outputs.loginServer.value, parameters('backendImageName'), parameters('imageTag'))]",
+                      "image": "[variables('backendImageUrl')]",
                       "resources": {
                         "requests": {
                           "cpu": 2,
@@ -48601,18 +48602,11 @@
                     }
                   ],
                   "dnsNameLabel": "[variables('containerInstanceName')]"
-                },
-                "imageRegistryCredentials": [
-                  {
-                    "server": "[reference(resourceId('Microsoft.Resources/deployments', take(format('module.compute.container-registry.{0}', variables('acrResourceName')), 64)), '2025-04-01').outputs.loginServer.value]",
-                    "identity": "[variables('userAssignedIdentityResourceIdForACI')]"
-                  }
-                ]
+                }
               },
               "dependsOn": [
                 "[resourceId('Microsoft.Resources/deployments', take(format('module.ai-project.{0}', variables('aiFoundryAiProjectResourceName')), 64))]",
                 "[resourceId('Microsoft.Resources/deployments', take(format('module.monitoring.app-insights.{0}', variables('applicationInsightsResourceName')), 64))]",
-                "[resourceId('Microsoft.Resources/deployments', take(format('module.compute.container-registry.{0}', variables('acrResourceName')), 64))]",
                 "[resourceId('Microsoft.Resources/deployments', take(format('module.identity.user-assigned-identity.{0}', variables('userAssignedIdentityResourceName')), 64))]"
               ]
             },
@@ -48934,137 +48928,6 @@
                   }
                 }
               }
-            },
-            {
-              "type": "Microsoft.Resources/deployments",
-              "apiVersion": "2025-04-01",
-              "name": "[take(format('module.compute.container-registry.{0}', variables('acrResourceName')), 64)]",
-              "properties": {
-                "expressionEvaluationOptions": {
-                  "scope": "inner"
-                },
-                "mode": "Incremental",
-                "parameters": {
-                  "name": {
-                    "value": "[variables('acrResourceName')]"
-                  },
-                  "location": {
-                    "value": "[variables('solutionLocation')]"
-                  },
-                  "tags": {
-                    "value": "[parameters('tags')]"
-                  },
-                  "enableTelemetry": {
-                    "value": "[parameters('enableTelemetry')]"
-                  },
-                  "principalId": {
-                    "value": "[reference(resourceId('Microsoft.Resources/deployments', take(format('module.identity.user-assigned-identity.{0}', variables('userAssignedIdentityResourceName')), 64)), '2025-04-01').outputs.principalId.value]"
-                  }
-                },
-                "template": {
-                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-                  "contentVersion": "1.0.0.0",
-                  "metadata": {
-                    "_generator": {
-                      "name": "bicep",
-                      "version": "0.43.8.12551",
-                      "templateHash": "9260461359375973947"
-                    }
-                  },
-                  "parameters": {
-                    "name": {
-                      "type": "string",
-                      "metadata": {
-                        "description": "Required. Name of the container registry."
-                      }
-                    },
-                    "location": {
-                      "type": "string",
-                      "metadata": {
-                        "description": "Required. Azure region for the resource."
-                      }
-                    },
-                    "tags": {
-                      "type": "object",
-                      "defaultValue": {},
-                      "metadata": {
-                        "description": "Optional. Tags to apply to the resource."
-                      }
-                    },
-                    "enableTelemetry": {
-                      "type": "bool",
-                      "defaultValue": true,
-                      "metadata": {
-                        "description": "Optional. Enable/Disable usage telemetry for module."
-                      }
-                    },
-                    "principalId": {
-                      "type": "string",
-                      "metadata": {
-                        "description": "Required. Principal ID of the managed identity to grant AcrPull."
-                      }
-                    }
-                  },
-                  "resources": [
-                    {
-                      "type": "Microsoft.ContainerRegistry/registries",
-                      "apiVersion": "2023-11-01-preview",
-                      "name": "[parameters('name')]",
-                      "location": "[parameters('location')]",
-                      "tags": "[parameters('tags')]",
-                      "sku": {
-                        "name": "Standard"
-                      },
-                      "properties": {
-                        "adminUserEnabled": false,
-                        "anonymousPullEnabled": false,
-                        "publicNetworkAccess": "Enabled",
-                        "networkRuleBypassOptions": "AzureServices"
-                      }
-                    },
-                    {
-                      "type": "Microsoft.Authorization/roleAssignments",
-                      "apiVersion": "2022-04-01",
-                      "scope": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('name'))]",
-                      "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('name')), parameters('principalId'), '7f951dda-4ed3-4680-a7ca-43fe172d538d')]",
-                      "properties": {
-                        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')]",
-                        "principalId": "[parameters('principalId')]",
-                        "principalType": "ServicePrincipal"
-                      },
-                      "dependsOn": [
-                        "[resourceId('Microsoft.ContainerRegistry/registries', parameters('name'))]"
-                      ]
-                    }
-                  ],
-                  "outputs": {
-                    "resourceId": {
-                      "type": "string",
-                      "metadata": {
-                        "description": "Resource ID of the container registry."
-                      },
-                      "value": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('name'))]"
-                    },
-                    "name": {
-                      "type": "string",
-                      "metadata": {
-                        "description": "Name of the container registry."
-                      },
-                      "value": "[parameters('name')]"
-                    },
-                    "loginServer": {
-                      "type": "string",
-                      "metadata": {
-                        "description": "Login server of the container registry."
-                      },
-                      "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('name')), '2023-11-01-preview').loginServer]"
-                    }
-                  }
-                }
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.Resources/deployments', take(format('module.identity.user-assigned-identity.{0}', variables('userAssignedIdentityResourceName')), 64))]"
-              ]
             },
             {
               "condition": "[not(variables('useExistingAiFoundryAiProject'))]",
@@ -50415,7 +50278,7 @@
                   },
                   "siteConfig": {
                     "value": {
-                      "linuxFxVersion": "NODE|22-lts",
+                      "linuxFxVersion": "[format('DOCKER|{0}.azurecr.io/{1}:{2}', parameters('acrName'), parameters('frontendImageName'), parameters('imageTag'))]",
                       "minTlsVersion": "1.2",
                       "alwaysOn": true,
                       "ftpsState": "FtpsOnly",
@@ -51148,7 +51011,7 @@
               "metadata": {
                 "description": "Contains ACR Name"
               },
-              "value": "[reference(resourceId('Microsoft.Resources/deployments', take(format('module.compute.container-registry.{0}', variables('acrResourceName')), 64)), '2025-04-01').outputs.name.value]"
+              "value": "[parameters('acrName')]"
             },
             "USE_FOUNDRY": {
               "type": "bool",
