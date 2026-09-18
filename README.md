@@ -1,3 +1,9 @@
+<hr>
+<h3 align="center">
+     <b>⚠️ This repository is no longer maintained ⚠️</b>
+</h3>
+<hr>
+
 # Content generation solution accelerator
 
 This solution accelerator is an internal chatbot that interprets and understands context and direction from creative briefs to create multi-modal text and image content for marketing ad campaigns. Built on the Microsoft Agent Framework with HandoffBuilder orchestration, it uses specialized AI agents to parse briefs, research product data, generate content, and validate brand compliance.
